@@ -7,6 +7,11 @@ const PAGE_SIZE = 100;
 const SELECTION_LIMIT = 5;
 
 const photos = [];
+const driveFolders = [];
+const selectedPhotosById = new Map();
+const folderHistory = [];
+const folderCache = new Map();
+const folderPreloads = new Map();
 const gallery = document.querySelector("#gallery");
 const selectedCount = document.querySelector("#selected-count");
 const photoCount = document.querySelector("#photo-count");
@@ -34,11 +39,20 @@ const tutorialVideo = document.querySelector("#tutorial-video");
 const tutorialVideoWrap = document.querySelector(".tutorial-video");
 const albumSelectButton = document.querySelector(".album-select-button");
 const albumOptions = document.querySelector(".album-options");
+const bottomFolderBack = document.querySelector(".bottom-folder-back");
 let currentFilter = "all";
 let nextPageToken = null;
 let loading = false;
 let currentPhotoIndex = -1;
 let totalDrivePhotos = null;
+let currentDriveFolderId = DRIVE_FOLDER_ID;
+let lightboxPhotoList = photos;
+let suppressNextFolderPop = false;
+
+window.history.replaceState({
+  galleryFolderId: DRIVE_FOLDER_ID,
+  folderTrail: []
+}, "");
 
 albumSelectButton.addEventListener("click", () => {
   const willOpen = albumSelectButton.getAttribute("aria-expanded") !== "true";
@@ -69,8 +83,7 @@ const siteHeader = document.querySelector(".site-header");
 let albumScrollFrame;
 
 function updateAlbumGlass() {
-  const isSticky = albumSelector.getBoundingClientRect().top <= siteHeader.offsetHeight + 1 && window.scrollY > 0;
-  albumSelector.classList.toggle("scrolled", isSticky);
+  albumSelector.classList.toggle("scrolled", window.scrollY > 4);
   albumScrollFrame = null;
 }
 
@@ -87,7 +100,7 @@ const heartIcon = `
   </svg>`;
 
 function updateCounts() {
-  const selectedTotal = photos.filter(photo => photo.selected).length;
+  const selectedTotal = selectedPhotosById.size;
   selectedCount.textContent = selectedTotal;
   photoCount.textContent = SELECTION_LIMIT;
   selectionCountBadge.classList.toggle("exceeded", selectedTotal > SELECTION_LIMIT);
@@ -101,7 +114,7 @@ function showSelectionLimitDialog() {
 }
 
 function updateLightbox() {
-  const photo = photos[currentPhotoIndex];
+  const photo = lightboxPhotoList[currentPhotoIndex];
   if (!photo) return;
   lightboxImage.src = `https://drive.google.com/thumbnail?id=${photo.id}&sz=w3000`;
   lightboxImage.alt = photo.name;
@@ -110,15 +123,16 @@ function updateLightbox() {
   lightboxHeart.setAttribute("aria-pressed", String(photo.selected));
   lightboxHeart.setAttribute("aria-label", `${photo.selected ? "Remove from" : "Add to"} selections`);
   previousPhoto.disabled = currentPhotoIndex === 0;
-  nextPhoto.disabled = currentPhotoIndex === photos.length - 1 && !nextPageToken;
-  const displayedTotal = totalDrivePhotos ?? photos.length;
-  lightboxCount.textContent = `${currentPhotoIndex + 1}/${displayedTotal}${totalDrivePhotos === null && nextPageToken ? "+" : ""}`;
+  const canLoadMore = currentFilter === "all" && nextPageToken;
+  nextPhoto.disabled = currentPhotoIndex === lightboxPhotoList.length - 1 && !canLoadMore;
+  const displayedTotal = currentFilter === "selected" ? lightboxPhotoList.length : (totalDrivePhotos ?? photos.length);
+  lightboxCount.textContent = `${currentPhotoIndex + 1}/${displayedTotal}${currentFilter === "all" && totalDrivePhotos === null && nextPageToken ? "+" : ""}`;
 }
 
-async function countDrivePhotos() {
+async function countDrivePhotos(folderId = currentDriveFolderId) {
   if (!GOOGLE_DRIVE_API_KEY) return;
 
-  const query = `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType contains 'image/'`;
+  const query = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
   let pageToken = "";
   let total = 0;
 
@@ -146,42 +160,150 @@ async function countDrivePhotos() {
   }
 }
 
-function renderGallery() {
-  const visible = currentFilter === "selected"
-    ? photos.filter(photo => photo.selected)
-    : photos;
-
-  if (!GOOGLE_DRIVE_API_KEY) {
-    gallery.innerHTML = `<p class="gallery-message">Add your Google Drive API key to <strong>GOOGLE_DRIVE_API_KEY</strong> at the top of <strong>script.js</strong> to display this public folder.</p>`;
-    return;
-  }
-
-  const cards = visible.map(photo => `
+function photoCardMarkup(photo) {
+  return `
     <article class="photo-card${photo.selected ? " selected" : ""}" data-id="${photo.id}">
       <div class="photo-wrap">
         <img src="${photo.src}" alt="${photo.name}" loading="lazy">
         <button class="heart" type="button" aria-label="${photo.selected ? "Remove from" : "Add to"} selections" aria-pressed="${photo.selected}">${heartIcon}</button>
       </div>
       <p class="filename">${photo.name}</p>
-    </article>`).join("");
+    </article>`;
+}
+
+function renderGallery(animateEntry = false) {
+  gallery.classList.toggle("animate-entry", animateEntry);
+  const visible = currentFilter === "selected"
+    ? [...selectedPhotosById.values()]
+    : photos;
+  if (!GOOGLE_DRIVE_API_KEY) {
+    gallery.innerHTML = `<p class="gallery-message">Add your Google Drive API key to <strong>GOOGLE_DRIVE_API_KEY</strong> at the top of <strong>script.js</strong> to display this public folder.</p>`;
+    return;
+  }
+
+  const folderCards = currentFilter === "all" ? driveFolders.map(folder => `
+    <article class="photo-card folder-card" data-folder-id="${folder.id}">
+      <div class="folder-visual" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path class="folder-rear" d="M3 6.2c0-1.1.9-2 2-2h5.1c.7 0 1.3.2 1.8.7l1.5 1.3c.4.4 1 .6 1.6.6h4c1.1 0 2 .9 2 2v9.1H3V6.2Z"/>
+          <path class="folder-paper" d="M5.1 9c0-.8.6-1.4 1.4-1.4h11c.8 0 1.4.6 1.4 1.4v7.4H5.1V9Z"/>
+          <path class="folder-front" d="M3 10.3c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v7.5c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-7.5Z"/>
+        </svg>
+      </div>
+      <p class="filename">${folder.name}</p>
+    </article>`).join("") : "";
+
+  const cards = visible.map(photoCardMarkup).join("");
 
   const empty = currentFilter === "selected" && !visible.length
     ? `<p class="empty-state">No photos selected yet.</p>`
-    : "";
+    : currentFilter === "all" && !driveFolders.length && !visible.length
+      ? `<p class="empty-state empty-folder-state">No items.</p>`
+      : "";
   const loadMore = currentFilter === "all" && nextPageToken
     ? `<button class="load-more" type="button" ${loading ? "disabled" : ""}>${loading ? "Loading…" : "Load More"}</button>`
     : "";
 
-  gallery.innerHTML = cards + empty + loadMore;
+  gallery.innerHTML = folderCards + cards + empty + loadMore;
   updateCounts();
+  if (animateEntry) {
+    window.setTimeout(() => gallery.classList.remove("animate-entry"), 360);
+  }
 }
 
-async function fetchDrivePhotos(pageToken = "") {
-  if (!GOOGLE_DRIVE_API_KEY || loading) return false;
-  loading = true;
-  renderGallery();
+function preloadDriveFolder(folderId) {
+  if (!GOOGLE_DRIVE_API_KEY || folderCache.has(folderId)) {
+    return Promise.resolve(folderCache.get(folderId));
+  }
+  if (folderPreloads.has(folderId)) return folderPreloads.get(folderId);
 
-  const query = `'${DRIVE_FOLDER_ID}' in parents and trashed = false and mimeType contains 'image/'`;
+  const folderQuery = `'${folderId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`;
+  const photoQuery = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
+  const makeParams = (query, pageSize, fields) => new URLSearchParams({
+    key: GOOGLE_DRIVE_API_KEY,
+    q: query,
+    pageSize: String(pageSize),
+    orderBy: "name_natural",
+    fields
+  });
+
+  const preload = Promise.all([
+    fetch(`https://www.googleapis.com/drive/v3/files?${makeParams(folderQuery, 1000, "files(id,name)")}`).then(response => {
+      if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
+      return response.json();
+    }),
+    fetch(`https://www.googleapis.com/drive/v3/files?${makeParams(photoQuery, PAGE_SIZE, "nextPageToken,files(id,name,mimeType)")}`).then(response => {
+      if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
+      return response.json();
+    })
+  ]).then(([folderData, photoData]) => {
+    const cached = {
+      folders: folderData.files,
+      photos: photoData.files.map(file => ({
+        id: file.id,
+        name: file.name,
+        src: `https://drive.google.com/thumbnail?id=${file.id}&sz=w1200`
+      })),
+      nextPageToken: photoData.nextPageToken || null
+    };
+    folderCache.set(folderId, cached);
+    return cached;
+  }).catch(error => {
+    console.warn("Could not preload Drive folder:", error);
+    return null;
+  }).finally(() => folderPreloads.delete(folderId));
+
+  folderPreloads.set(folderId, preload);
+  return preload;
+}
+
+function cacheCurrentFolder() {
+  folderCache.set(currentDriveFolderId, {
+    folders: driveFolders.map(folder => ({ ...folder })),
+    photos: photos.map(({ id, name, src }) => ({ id, name, src })),
+    nextPageToken
+  });
+}
+
+async function fetchDriveFolders(folderId = currentDriveFolderId, shouldRender = true) {
+  if (!GOOGLE_DRIVE_API_KEY) return false;
+
+  const query = `'${folderId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`;
+  const params = new URLSearchParams({
+    key: GOOGLE_DRIVE_API_KEY,
+    q: query,
+    pageSize: "1000",
+    orderBy: "name_natural",
+    fields: "files(id,name)"
+  });
+
+  try {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
+    if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
+    const data = await response.json();
+    driveFolders.push(...data.files);
+    data.files.forEach(folder => preloadDriveFolder(folder.id));
+    if (shouldRender) renderGallery();
+    return true;
+  } catch (error) {
+    console.warn("Could not load Drive subfolders:", error);
+    return false;
+  }
+}
+
+async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId, shouldRender = true) {
+  if (!GOOGLE_DRIVE_API_KEY || loading) return false;
+  const isAppending = Boolean(pageToken);
+  loading = true;
+  if (shouldRender && isAppending) {
+    const loadMoreButton = gallery.querySelector(".load-more");
+    if (loadMoreButton) {
+      loadMoreButton.disabled = true;
+      loadMoreButton.textContent = "Loading…";
+    }
+  }
+
+  const query = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
   const params = new URLSearchParams({
     key: GOOGLE_DRIVE_API_KEY,
     q: query,
@@ -195,13 +317,23 @@ async function fetchDrivePhotos(pageToken = "") {
     const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
     if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
     const data = await response.json();
-    photos.push(...data.files.map(file => ({
+    const newPhotos = data.files.map(file => ({
       id: file.id,
       name: file.name,
       src: `https://drive.google.com/thumbnail?id=${file.id}&sz=w1200`,
-      selected: false
-    })));
+      selected: selectedPhotosById.has(file.id)
+    }));
+    photos.push(...newPhotos);
     nextPageToken = data.nextPageToken || null;
+
+    if (shouldRender && isAppending) {
+      gallery.querySelector(".load-more")?.remove();
+      gallery.insertAdjacentHTML("beforeend", newPhotos.map(photoCardMarkup).join(""));
+      if (nextPageToken) {
+        gallery.insertAdjacentHTML("beforeend", `<button class="load-more" type="button">Load More</button>`);
+      }
+      updateCounts();
+    }
   } catch (error) {
     gallery.innerHTML = `<p class="gallery-message">The photos could not be loaded. Confirm that the folder and its images are public and that the Drive API key is valid.<br><small>${error.message}</small></p>`;
     loading = false;
@@ -209,22 +341,80 @@ async function fetchDrivePhotos(pageToken = "") {
   }
 
   loading = false;
-  renderGallery();
+  if (shouldRender && !isAppending) {
+    renderGallery();
+  }
   return true;
+}
+
+async function loadDriveFolder(folderId) {
+  currentDriveFolderId = folderId;
+  photos.length = 0;
+  driveFolders.length = 0;
+  nextPageToken = null;
+  totalDrivePhotos = null;
+  currentPhotoIndex = -1;
+  loading = false;
+
+  const cached = folderCache.get(folderId);
+  if (cached) {
+    driveFolders.push(...cached.folders);
+    photos.push(...cached.photos.map(photo => ({
+      ...photo,
+      selected: selectedPhotosById.has(photo.id)
+    })));
+    nextPageToken = cached.nextPageToken;
+    renderGallery(true);
+    cached.folders.forEach(folder => preloadDriveFolder(folder.id));
+    countDrivePhotos(folderId);
+    return;
+  }
+
+  gallery.innerHTML = `
+    <div class="folder-loading" role="status" aria-live="polite">
+      <span aria-hidden="true"></span>
+      <p>Opening folder…</p>
+    </div>`;
+
+  await Promise.all([
+    fetchDriveFolders(folderId, false),
+    fetchDrivePhotos("", folderId, false)
+  ]);
+  folderCache.set(folderId, {
+    folders: driveFolders.map(folder => ({ ...folder })),
+    photos: photos.map(({ id, name, src }) => ({ id, name, src })),
+    nextPageToken
+  });
+  renderGallery(true);
+  countDrivePhotos(folderId);
 }
 
 gallery.addEventListener("click", event => {
   if (event.target.closest(".load-more")) {
-    fetchDrivePhotos(nextPageToken);
+    fetchDrivePhotos(nextPageToken, currentDriveFolderId);
+    return;
+  }
+
+  const folderCard = event.target.closest(".folder-card");
+  if (folderCard) {
+    cacheCurrentFolder();
+    folderHistory.push({ id: currentDriveFolderId });
+    const folderId = folderCard.dataset.folderId;
+    window.history.pushState({
+      galleryFolderId: folderId,
+      folderTrail: folderHistory.map(folder => folder.id)
+    }, "");
+    loadDriveFolder(folderId);
     return;
   }
 
   const clickedImage = event.target.closest(".photo-wrap img");
   if (clickedImage) {
     const card = clickedImage.closest(".photo-card");
-    const photo = photos.find(item => item.id === card.dataset.id);
+    lightboxPhotoList = currentFilter === "selected" ? [...selectedPhotosById.values()] : photos;
+    const photo = lightboxPhotoList.find(item => item.id === card.dataset.id);
     if (!photo) return;
-    currentPhotoIndex = photos.indexOf(photo);
+    currentPhotoIndex = lightboxPhotoList.indexOf(photo);
     updateLightbox();
     lightbox.showModal();
     document.body.classList.add("lightbox-open");
@@ -234,14 +424,16 @@ gallery.addEventListener("click", event => {
   const heartButton = event.target.closest(".heart");
   if (!heartButton) return;
   const card = heartButton.closest(".photo-card");
-  const photo = photos.find(item => item.id === card.dataset.id);
+  const photo = photos.find(item => item.id === card.dataset.id) || selectedPhotosById.get(card.dataset.id);
   if (!photo) return;
   photo.selected = !photo.selected;
-  const showLimitWarning = photo.selected && photos.filter(item => item.selected).length === SELECTION_LIMIT + 1;
+  if (photo.selected) selectedPhotosById.set(photo.id, photo);
+  else selectedPhotosById.delete(photo.id);
+  const showLimitWarning = photo.selected && selectedPhotosById.size === SELECTION_LIMIT + 1;
 
   if (currentFilter === "selected" && !photo.selected) {
     card.remove();
-    if (!photos.some(item => item.selected)) renderGallery();
+    if (!selectedPhotosById.size) renderGallery();
   } else {
     card.classList.toggle("selected", photo.selected);
     heartButton.setAttribute("aria-pressed", String(photo.selected));
@@ -254,11 +446,46 @@ gallery.addEventListener("click", event => {
   }
 });
 
+bottomFolderBack.addEventListener("pointerdown", () => {
+  bottomFolderBack.classList.add("pressing");
+});
+
+["pointerup", "pointercancel", "pointerleave"].forEach(eventName => {
+  bottomFolderBack.addEventListener(eventName, () => {
+    bottomFolderBack.classList.remove("pressing");
+  });
+});
+
+bottomFolderBack.addEventListener("click", () => {
+  if (!folderHistory.length) return;
+
+  const parent = folderHistory.pop();
+  suppressNextFolderPop = true;
+  loadDriveFolder(parent.id);
+  window.history.back();
+});
+
+window.addEventListener("popstate", event => {
+  if (suppressNextFolderPop) {
+    suppressNextFolderPop = false;
+    return;
+  }
+
+  const state = event.state;
+  if (!state?.galleryFolderId) return;
+
+  folderHistory.length = 0;
+  folderHistory.push(...(state.folderTrail || []).map(id => ({ id })));
+  loadDriveFolder(state.galleryFolderId);
+});
+
 lightboxHeart.addEventListener("click", () => {
-  const photo = photos[currentPhotoIndex];
+  const photo = lightboxPhotoList[currentPhotoIndex];
   if (!photo) return;
   photo.selected = !photo.selected;
-  const showLimitWarning = photo.selected && photos.filter(item => item.selected).length === SELECTION_LIMIT + 1;
+  if (photo.selected) selectedPhotosById.set(photo.id, photo);
+  else selectedPhotosById.delete(photo.id);
+  const showLimitWarning = photo.selected && selectedPhotosById.size === SELECTION_LIMIT + 1;
   lightboxHeart.setAttribute("aria-pressed", String(photo.selected));
   lightboxHeart.setAttribute("aria-label", `${photo.selected ? "Remove from" : "Add to"} selections`);
 
@@ -283,7 +510,7 @@ previousPhoto.addEventListener("click", () => {
 });
 
 nextPhoto.addEventListener("click", async () => {
-  if (currentPhotoIndex < photos.length - 1) {
+  if (currentPhotoIndex < lightboxPhotoList.length - 1) {
     currentPhotoIndex += 1;
     updateLightbox();
     return;
@@ -292,8 +519,9 @@ nextPhoto.addEventListener("click", async () => {
   if (nextPageToken) {
     nextPhoto.disabled = true;
     const previousLength = photos.length;
-    const loaded = await fetchDrivePhotos(nextPageToken);
+    const loaded = await fetchDrivePhotos(nextPageToken, currentDriveFolderId);
     if (loaded && photos.length > previousLength) {
+      lightboxPhotoList = photos;
       currentPhotoIndex += 1;
     }
     updateLightbox();
@@ -310,20 +538,27 @@ lightbox.addEventListener("close", () => {
 });
 
 filters.forEach(button => button.addEventListener("click", () => {
+  if (button.dataset.filter === currentFilter) return;
   const preservedScrollY = window.scrollY;
   currentFilter = button.dataset.filter;
-  filters.forEach(item => item.classList.toggle("active", item === button));
+  filters.forEach(item => {
+    const isActive = item === button;
+    item.classList.toggle("active", isActive);
+    item.disabled = isActive;
+  });
   document.querySelector(".filter-control").classList.toggle("selections-active", currentFilter === "selected");
   gallery.style.removeProperty("min-height");
   renderGallery();
-  requestAnimationFrame(() => {
-    const maximumScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
-    window.scrollTo(0, Math.min(preservedScrollY, maximumScroll));
-  });
+  const maximumScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
+  window.scrollTo(0, Math.min(preservedScrollY, maximumScroll));
 }));
 
+filters.forEach(button => {
+  button.disabled = button.dataset.filter === currentFilter;
+});
+
 document.querySelector(".header-submit").addEventListener("click", () => {
-  const selectedPhotos = photos.filter(photo => photo.selected);
+  const selectedPhotos = [...selectedPhotosById.values()];
   summaryAlbum.textContent = albumSelectButton.querySelector("span").textContent;
   summaryCount.textContent = selectedPhotos.length;
   summaryLimit.textContent = SELECTION_LIMIT;
@@ -342,7 +577,7 @@ document.querySelector(".summary-no").addEventListener("click", () => summaryDia
 summaryYes.addEventListener("click", () => {
   summaryDialog.close();
   document.dispatchEvent(new CustomEvent("gallery:selection-confirmed", {
-    detail: { photos: photos.filter(photo => photo.selected) }
+    detail: { photos: [...selectedPhotosById.values()] }
   }));
 });
 document.querySelector(".limit-ok").addEventListener("click", () => limitDialog.close());
@@ -385,10 +620,7 @@ infoDialog.addEventListener("close", () => {
   });
 });
 
-renderGallery();
-fetchDrivePhotos().then(loaded => {
-  if (loaded) countDrivePhotos();
-});
+loadDriveFolder(DRIVE_FOLDER_ID);
 
 document.addEventListener("contextmenu", event => event.preventDefault());
 document.addEventListener("dragstart", event => {
