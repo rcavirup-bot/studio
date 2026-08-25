@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#183779">
+  <title>Nisha &amp; Mrinmoy — Photo Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <img class="brand" src="https://ik.imagekit.io/d3ycnoiwd/PrantikWebsite/logo.png" alt="Prantik Photography">
+    <button class="header-info" type="button" aria-label="Gallery information">i</button>
+    <button class="header-logout" type="button" aria-label="Log out">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/>
+      </svg>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="gallery-title">
+      <div class="mandala mandala-top" aria-hidden="true"></div>
+      <div class="mandala mandala-left" aria-hidden="true"></div>
+      <h1 id="gallery-title">Nisha &amp; Mrinmoy</h1>
+      <p>Photo Gallery</p>
+    </section>
+
+    <section class="album-selector" aria-label="Album selection">
+      <span class="album-selector-label">Selecting for :</span>
+      <div class="select-wrap">
+        <button class="album-select-button" id="album-select" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <svg class="album-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.2 5.2C6 3.8 9.1 3.7 11.5 5.3v14.2c-2.5-1.5-5.4-1.5-8.1-.2-.7.3-1.4-.2-1.4-.9V6.7c0-.7.5-1.2 1.2-1.5Z"/>
+            <path d="M20.8 5.2C18 3.8 14.9 3.7 12.5 5.3v14.2c2.5-1.5 5.4-1.5 8.1-.2.7.3 1.4-.2 1.4-.9V6.7c0-.7-.5-1.2-1.2-1.5Z"/>
+          </svg>
+          <span>Album 1</span>
+          <svg class="album-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9.5 5 5 5-5"/></svg>
+        </button>
+        <div class="album-options" role="listbox" aria-label="Select album" hidden>
+          <button type="button" role="option" data-value="album-1" aria-selected="true">Album 1</button>
+          <button type="button" role="option" data-value="album-2" aria-selected="false">Album 2</button>
+        </div>
+      </div>
+      <button class="header-submit" type="button">Submit</button>
+    </section>
+
+    <section class="gallery" aria-label="Wedding photo gallery" id="gallery"></section>
+  </main>
+
+  <dialog class="lightbox" id="lightbox" aria-label="Full-size photograph">
+    <button class="lightbox-close" type="button" aria-label="Close photograph">&times;</button>
+    <span class="lightbox-count" id="lightbox-count" aria-live="polite">1/100+</span>
+    <button class="lightbox-heart" type="button" aria-label="Add to selections" aria-pressed="false"></button>
+    <img id="lightbox-image" src="" alt="">
+    <p id="lightbox-caption"></p>
+    <div class="lightbox-navigation">
+      <button id="previous-photo" type="button" aria-label="Previous photograph">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <button id="next-photo" type="button" aria-label="Next photograph">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <dialog class="summary-dialog" id="selection-summary" aria-labelledby="summary-title">
+    <div class="summary-header">
+      <div>
+        <p>Photo Gallery</p>
+        <h2 id="summary-title">Selection Summary</h2>
+      </div>
+    </div>
+    <div class="summary-confirmation">
+      <div class="summary-album">Selected for : <span id="summary-album">Album 1</span></div>
+      <strong><span id="summary-count">0</span>/<span id="summary-limit-total">5</span> Photos selected</strong>
+      <div class="selection-progress" role="progressbar" aria-label="Selection progress" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">
+        <span id="selection-progress-fill"></span>
+      </div>
+      <div class="progress-limit">Max limit: <span id="summary-limit">5</span> Photos</div>
+      <p>Do you want to submit this selection?</p>
+    </div>
+    <div class="summary-actions">
+      <button class="summary-no" type="button">No</button>
+      <button class="summary-yes" type="button">Yes</button>
+    </div>
+  </dialog>
+
+  <dialog class="limit-dialog" id="limit-dialog" aria-labelledby="limit-title">
+    <div class="limit-icon" aria-hidden="true">!</div>
+    <h2 id="limit-title">Selection limit reached</h2>
+    <p>You have reached the maximum recommended selection of <span id="limit-value">5</span> photos.</p>
+    <button class="limit-ok" type="button">OK</button>
+  </dialog>
+
+  <dialog class="limit-dialog logout-dialog" id="logout-dialog" aria-labelledby="logout-title">
+    <div class="logout-dialog-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg>
+    </div>
+    <h2 id="logout-title">Log out?</h2>
+    <p>Are you sure you want to log out of this gallery?</p>
+    <div class="summary-actions logout-actions">
+      <button class="logout-no summary-no" type="button">No</button>
+      <button class="logout-yes summary-yes" type="button">Yes</button>
+    </div>
+  </dialog>
+
+  <dialog class="summary-dialog info-dialog" id="info-dialog" aria-labelledby="info-title">
+    <div class="summary-header info-dialog-header">
+      <div>
+        <p>Gallery Help</p>
+        <h2 id="info-title">How to use this site</h2>
+      </div>
+      <button class="info-close" type="button" aria-label="Close tutorial">&times;</button>
+    </div>
+    <div class="tutorial-card">
+      <div class="tutorial-video">
+        <button class="tutorial-poster" type="button" aria-label="Play tutorial video">
+          <img src="https://i.ytimg.com/vi/RZhJ6NaGSRY/maxresdefault.jpg" alt="Gallery tutorial video preview">
+          <span class="tutorial-play" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z"/></svg>
+          </span>
+        </button>
+        <iframe id="tutorial-video" data-src="https://www.youtube-nocookie.com/embed/RZhJ6NaGSRY?rel=0&amp;controls=0&amp;iv_load_policy=3&amp;playsinline=1&amp;disablekb=1" title="Gallery tutorial video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+    </div>
+    <div class="gallery-tips">
+      <h3>Quick tips</h3>
+      <ol>
+        <li>Choose the album you are selecting photos for.</li>
+        <li>Tap a heart to select or deselect a photo.</li>
+        <li>Tap a photo to open the full-view screen.</li>
+        <li>Use the Selections tab to review your chosen photos.</li>
+        <li>Tap Submit and confirm when your selection is ready.</li>
+      </ol>
+    </div>
+  </dialog>
+
+  <nav class="bottom-bar" aria-label="Gallery filters">
+    <div class="filter-control">
+      <button class="filter-button active" type="button" data-filter="all">All Photos</button>
+      <button class="filter-button" type="button" data-filter="selected">
+        <span class="filter-label">Selections</span>
+        <span class="selection-count"><span id="selected-count">0</span>/<span id="photo-count">5</span></span>
+      </button>
+    </div>
+  </nav>
+
+  <script src="script.js"></script>
+</body>
+</html>
