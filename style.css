@@ -386,20 +386,43 @@ button { font: inherit; }
 .gallery {
   position: relative;
   z-index: 1;
-  padding: 24px 26px 118px;
+  padding: 22px 22px 118px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   align-items: start;
-  gap: 26px 21px;
+  gap: 22px;
   background: linear-gradient(180deg, #e3f1f9 0%, #d7e9f4 55%, #c9dfec 100%);
   min-height: calc(100dvh - 154px);
   overflow-anchor: none;
 }
 
+.gallery-folder-title {
+  grid-column: 1 / -1;
+  margin: 1px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: rgba(20, 39, 55, .82);
+  font-size: clamp(15px, 3.3vw, 19px);
+  font-weight: 400;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.gallery-folder-title svg {
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+}
+
 .photo-card {
   overflow: hidden;
   position: relative;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 76px;
   border: 0;
   border-radius: 18px;
   background: #fff;
@@ -421,6 +444,7 @@ button { font: inherit; }
 }
 
 .photo-card:active { transform: scale(.985); }
+.photo-card:has(.heart:active) { transform: none; }
 .photo-card.selected {
   background: #ffecee;
   box-shadow:
@@ -433,19 +457,28 @@ button { font: inherit; }
 }
 
 .photo-wrap {
-  height: 216px;
+  height: auto;
+  min-height: 0;
   overflow: hidden;
   position: relative;
   background: #b57e59;
 }
 
-.folder-card { cursor: pointer; }
+.folder-card {
+  cursor: pointer;
+  background: #f7df91;
+}
+
+.folder-card::after {
+  border-color: #e3b43b;
+}
 
 .folder-visual {
-  height: 216px;
+  height: auto;
+  min-height: 0;
   display: grid;
   place-items: center;
-  background: linear-gradient(145deg, #edf5fb, #d4e5f1);
+  background: linear-gradient(145deg, #ffffff, #fff9e8);
 }
 
 .folder-visual svg {
@@ -462,6 +495,7 @@ button { font: inherit; }
 .folder-card .filename {
   color: rgba(23, 23, 23, .78);
   font-weight: 600;
+  background: #fbe7a4;
 }
 
 .photo-wrap img {
@@ -838,7 +872,7 @@ button { font: inherit; }
 
 .lightbox-heart svg { width: 33px; height: 33px; fill: currentColor; }
 .lightbox-heart[aria-pressed="true"] { color: #ff2028; background: rgba(255,255,255,.94); }
-.lightbox-heart:active { transform: scale(.94); }
+.lightbox-heart:active { transform: none; }
 
 .lightbox-navigation {
   width: min(100%, 320px);
@@ -1341,11 +1375,12 @@ button { font: inherit; }
   .album-selector-label { font-size: 13px; }
   .select-wrap { min-width: 154px; }
   .album-select-button { height: 40px; font-size: 15px; }
-  .gallery { padding: 16px 14px 96px; gap: 16px 12px; }
+  .gallery { padding: 14px 14px 96px; gap: 14px; }
   .gallery { min-height: calc(100dvh - 126px); }
   .photo-card { border-radius: 14px; }
-  .photo-wrap { height: 32vw; min-height: 126px; max-height: 180px; }
-  .folder-visual { height: 32vw; min-height: 126px; max-height: 180px; }
+  .photo-card { grid-template-rows: minmax(0, 1fr) 56px; }
+  .photo-wrap,
+  .folder-visual { height: auto; min-height: 0; max-height: none; }
   .heart { width: 46px; height: 46px; top: 8px; right: 8px; }
   .heart svg { width: 29px; height: 29px; }
   .filename { height: 56px; padding: 0 12px; font-size: 16px; }

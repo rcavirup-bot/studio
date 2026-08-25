@@ -12,6 +12,7 @@ const selectedPhotosById = new Map();
 const folderHistory = [];
 const folderCache = new Map();
 const folderPreloads = new Map();
+const driveFolderNames = new Map();
 const gallery = document.querySelector("#gallery");
 const selectedCount = document.querySelector("#selected-count");
 const photoCount = document.querySelector("#photo-count");
@@ -171,6 +172,18 @@ function photoCardMarkup(photo) {
     </article>`;
 }
 
+function folderTitleMarkup() {
+  const folderName = driveFolderNames.get(currentDriveFolderId);
+  return `<h2 class="gallery-folder-title">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path class="folder-rear" d="M3 6.2c0-1.1.9-2 2-2h5.1c.7 0 1.3.2 1.8.7l1.5 1.3c.4.4 1 .6 1.6.6h4c1.1 0 2 .9 2 2v9.1H3V6.2Z"/>
+      <path class="folder-paper" d="M5.1 9c0-.8.6-1.4 1.4-1.4h11c.8 0 1.4.6 1.4 1.4v7.4H5.1V9Z"/>
+      <path class="folder-front" d="M3 10.3c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v7.5c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-7.5Z"/>
+    </svg>
+    <span>${folderName || "Photo Gallery"}</span>
+  </h2>`;
+}
+
 function renderGallery(animateEntry = false) {
   gallery.classList.toggle("animate-entry", animateEntry);
   const visible = currentFilter === "selected"
@@ -180,6 +193,8 @@ function renderGallery(animateEntry = false) {
     gallery.innerHTML = `<p class="gallery-message">Add your Google Drive API key to <strong>GOOGLE_DRIVE_API_KEY</strong> at the top of <strong>script.js</strong> to display this public folder.</p>`;
     return;
   }
+
+  const folderTitle = folderTitleMarkup();
 
   const folderCards = currentFilter === "all" ? driveFolders.map(folder => `
     <article class="photo-card folder-card" data-folder-id="${folder.id}">
@@ -204,10 +219,29 @@ function renderGallery(animateEntry = false) {
     ? `<button class="load-more" type="button" ${loading ? "disabled" : ""}>${loading ? "Loading…" : "Load More"}</button>`
     : "";
 
-  gallery.innerHTML = folderCards + cards + empty + loadMore;
+  gallery.innerHTML = folderTitle + folderCards + cards + empty + loadMore;
   updateCounts();
   if (animateEntry) {
     window.setTimeout(() => gallery.classList.remove("animate-entry"), 360);
+  }
+}
+
+async function fetchDriveFolderName(folderId) {
+  if (!GOOGLE_DRIVE_API_KEY || driveFolderNames.has(folderId)) return;
+
+  const params = new URLSearchParams({
+    key: GOOGLE_DRIVE_API_KEY,
+    fields: "id,name",
+    supportsAllDrives: "true"
+  });
+
+  try {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?${params}`);
+    if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
+    const folder = await response.json();
+    driveFolderNames.set(folder.id, folder.name);
+  } catch (error) {
+    console.warn("Could not load Drive folder name:", error);
   }
 }
 
@@ -281,6 +315,7 @@ async function fetchDriveFolders(folderId = currentDriveFolderId, shouldRender =
     const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
     if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
     const data = await response.json();
+    data.files.forEach(folder => driveFolderNames.set(folder.id, folder.name));
     driveFolders.push(...data.files);
     data.files.forEach(folder => preloadDriveFolder(folder.id));
     if (shouldRender) renderGallery();
@@ -335,7 +370,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
       updateCounts();
     }
   } catch (error) {
-    gallery.innerHTML = `<p class="gallery-message">The photos could not be loaded. Confirm that the folder and its images are public and that the Drive API key is valid.<br><small>${error.message}</small></p>`;
+    gallery.innerHTML = `${folderTitleMarkup()}<p class="gallery-message">The photos could not be loaded. Confirm that the folder and its images are public and that the Drive API key is valid.<br><small>${error.message}</small></p>`;
     loading = false;
     return false;
   }
@@ -370,13 +405,14 @@ async function loadDriveFolder(folderId) {
     return;
   }
 
-  gallery.innerHTML = `
+  gallery.innerHTML = `${folderTitleMarkup()}
     <div class="folder-loading" role="status" aria-live="polite">
       <span aria-hidden="true"></span>
       <p>Opening folder…</p>
     </div>`;
 
   await Promise.all([
+    fetchDriveFolderName(folderId),
     fetchDriveFolders(folderId, false),
     fetchDrivePhotos("", folderId, false)
   ]);
@@ -400,6 +436,8 @@ gallery.addEventListener("click", event => {
     cacheCurrentFolder();
     folderHistory.push({ id: currentDriveFolderId });
     const folderId = folderCard.dataset.folderId;
+    const folder = driveFolders.find(item => item.id === folderId);
+    if (folder?.name) driveFolderNames.set(folderId, folder.name);
     window.history.pushState({
       galleryFolderId: folderId,
       folderTrail: folderHistory.map(folder => folder.id)
