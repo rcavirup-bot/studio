@@ -5,6 +5,11 @@ const DRIVE_FOLDER_ID = "1w0tNfhZzmanDLI5sq1dxhmqgh5fbxvHV";
 const GOOGLE_DRIVE_API_KEY = "AIzaSyDbFk_auMNRCkkvH2qD9_KRFg48MEbw6p4";
 const PAGE_SIZE = 100;
 const SELECTION_LIMIT = 5;
+const TILE_THUMBNAIL_WIDTH = 240;
+const FULL_VIEW_WIDTH = 900;
+
+const driveThumbnailUrl = (fileId, width) =>
+  `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
 
 const photos = [];
 const driveFolders = [];
@@ -81,16 +86,17 @@ document.addEventListener("click", event => {
 
 const albumSelector = document.querySelector(".album-selector");
 const siteHeader = document.querySelector(".site-header");
-let albumScrollFrame;
 
 function updateAlbumGlass() {
   albumSelector.classList.toggle("scrolled", window.scrollY > 4);
-  albumScrollFrame = null;
+  const galleryProgressWrap = gallery.querySelector(".gallery-progress-wrap");
+  if (galleryProgressWrap) {
+    const touchesStickyArea = galleryProgressWrap.getBoundingClientRect().top <= albumSelector.getBoundingClientRect().bottom + 1;
+    galleryProgressWrap.classList.toggle("under-sticky", touchesStickyArea);
+  }
 }
 
-window.addEventListener("scroll", () => {
-  if (!albumScrollFrame) albumScrollFrame = requestAnimationFrame(updateAlbumGlass);
-}, { passive: true });
+window.addEventListener("scroll", updateAlbumGlass, { passive: true });
 
 window.addEventListener("resize", updateAlbumGlass);
 updateAlbumGlass();
@@ -100,11 +106,59 @@ const heartIcon = `
     <path d="M12 21.2 10.55 19.88C5.4 15.2 2 12.1 2 8.3 2 5.2 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.04 6.04 0 0 1 16.5 3C19.58 3 22 5.2 22 8.3c0 3.8-3.4 6.9-8.55 11.58L12 21.2Z"/>
   </svg>`;
 
+function updateBottomFolderIcon() {
+  const insideFolder = currentFilter === "all" && folderHistory.length > 0;
+  const mode = insideFolder ? "back" : "home";
+  const currentMode = bottomFolderBack.dataset.mode;
+  const pendingMode = bottomFolderBack.dataset.pendingMode;
+  if (pendingMode === mode || (currentMode === mode && !pendingMode)) return;
+  if (pendingMode) {
+    bottomFolderBack.dataset.pendingMode = mode;
+    return;
+  }
+
+  const applyIcon = nextMode => {
+    bottomFolderBack.dataset.mode = nextMode;
+    bottomFolderBack.setAttribute("aria-label", nextMode === "back" ? "Go back to previous folder" : "Root folder");
+    bottomFolderBack.innerHTML = nextMode === "back"
+      ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>`
+      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.7 10.7 10.8 3a1.75 1.75 0 0 1 2.4 0l8.1 7.7c1.1 1 .4 2.8-1.2 2.8h-1V20c0 1.1-.9 2-2 2h-3.2v-5.2c0-1-.8-1.8-1.8-1.8h-.2c-1 0-1.8.8-1.8 1.8V22H6.9c-1.1 0-2-.9-2-2v-6.5h-1c-1.6 0-2.3-1.8-1.2-2.8Z"/></svg>`;
+  };
+
+  if (!bottomFolderBack.dataset.mode) {
+    applyIcon(mode);
+    return;
+  }
+
+  bottomFolderBack.dataset.pendingMode = mode;
+  bottomFolderBack.classList.add("icon-changing-out");
+  window.setTimeout(() => {
+    const nextMode = bottomFolderBack.dataset.pendingMode;
+    delete bottomFolderBack.dataset.pendingMode;
+    applyIcon(nextMode);
+    bottomFolderBack.classList.remove("icon-changing-out");
+    bottomFolderBack.classList.add("icon-changing-in");
+    window.setTimeout(() => bottomFolderBack.classList.remove("icon-changing-in"), 220);
+  }, 150);
+}
+
 function updateCounts() {
   const selectedTotal = selectedPhotosById.size;
   selectedCount.textContent = selectedTotal;
   photoCount.textContent = SELECTION_LIMIT;
+  gallery.classList.toggle("limit-reached", selectedTotal === SELECTION_LIMIT);
+  gallery.classList.toggle("selection-exceeded", selectedTotal > SELECTION_LIMIT);
+  selectionCountBadge.classList.toggle("limit-reached", selectedTotal === SELECTION_LIMIT);
   selectionCountBadge.classList.toggle("exceeded", selectedTotal > SELECTION_LIMIT);
+  const galleryProgress = gallery.querySelector(".gallery-selection-progress");
+  if (galleryProgress) {
+    galleryProgress.setAttribute("aria-valuenow", String(selectedTotal));
+    galleryProgress.classList.toggle("limit-reached", selectedTotal === SELECTION_LIMIT);
+    galleryProgress.classList.toggle("exceeded", selectedTotal > SELECTION_LIMIT);
+    galleryProgress.querySelector("span").style.width = `${Math.min(selectedTotal / SELECTION_LIMIT, 1) * 100}%`;
+    const selectedLabel = galleryProgress.closest(".gallery-progress-wrap")?.querySelector(".gallery-progress-selected");
+    if (selectedLabel) selectedLabel.textContent = `${selectedTotal} Photos selected`;
+  }
 }
 
 function showSelectionLimitDialog() {
@@ -117,7 +171,7 @@ function showSelectionLimitDialog() {
 function updateLightbox() {
   const photo = lightboxPhotoList[currentPhotoIndex];
   if (!photo) return;
-  lightboxImage.src = `https://drive.google.com/thumbnail?id=${photo.id}&sz=w3000`;
+  lightboxImage.src = driveThumbnailUrl(photo.id, FULL_VIEW_WIDTH);
   lightboxImage.alt = photo.name;
   lightboxCaption.textContent = photo.name;
   lightboxHeart.innerHTML = heartIcon;
@@ -165,7 +219,7 @@ function photoCardMarkup(photo) {
   return `
     <article class="photo-card${photo.selected ? " selected" : ""}" data-id="${photo.id}">
       <div class="photo-wrap">
-        <img src="${photo.src}" alt="${photo.name}" loading="lazy">
+        <img src="${photo.src}" alt="${photo.name}" decoding="async">
         <button class="heart" type="button" aria-label="${photo.selected ? "Remove from" : "Add to"} selections" aria-pressed="${photo.selected}">${heartIcon}</button>
       </div>
       <p class="filename">${photo.name}</p>
@@ -174,17 +228,56 @@ function photoCardMarkup(photo) {
 
 function folderTitleMarkup() {
   const folderName = driveFolderNames.get(currentDriveFolderId);
-  return `<h2 class="gallery-folder-title">
+  return `<h2 class="gallery-folder-title${folderName ? "" : " title-loading"}">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path class="folder-rear" d="M3 6.2c0-1.1.9-2 2-2h5.1c.7 0 1.3.2 1.8.7l1.5 1.3c.4.4 1 .6 1.6.6h4c1.1 0 2 .9 2 2v9.1H3V6.2Z"/>
       <path class="folder-paper" d="M5.1 9c0-.8.6-1.4 1.4-1.4h11c.8 0 1.4.6 1.4 1.4v7.4H5.1V9Z"/>
       <path class="folder-front" d="M3 10.3c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v7.5c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-7.5Z"/>
     </svg>
-    <span>${folderName || "Photo Gallery"}</span>
+    <span>${folderName || ""}</span>
   </h2>`;
 }
 
+function animateSelectionRemoval(card) {
+  if (!card || card.classList.contains("removing")) return;
+  const remainingCards = [...gallery.querySelectorAll(".photo-card:not(.removing)")]
+    .filter(item => item !== card);
+  const previousPositions = new Map(remainingCards.map(item => [item, item.getBoundingClientRect()]));
+  card.classList.add("removing");
+  window.setTimeout(() => {
+    card.remove();
+    if (currentFilter === "selected" && !selectedPhotosById.size) {
+      renderGallery(true);
+      return;
+    }
+
+    remainingCards.forEach(item => {
+      if (!item.isConnected) return;
+      const previous = previousPositions.get(item);
+      const current = item.getBoundingClientRect();
+      const offsetX = previous.left - current.left;
+      const offsetY = previous.top - current.top;
+      if (!offsetX && !offsetY) return;
+      item.style.transition = "none";
+      item.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+      item.style.willChange = "transform";
+    });
+
+    void gallery.offsetWidth;
+    remainingCards.forEach(item => {
+      if (!item.isConnected || !item.style.transform) return;
+      item.style.transition = "transform .38s cubic-bezier(.22, .8, .3, 1)";
+      item.style.transform = "";
+      window.setTimeout(() => {
+        item.style.transition = "";
+        item.style.willChange = "";
+      }, 400);
+    });
+  }, 280);
+}
+
 function renderGallery(animateEntry = false) {
+  updateBottomFolderIcon();
   gallery.classList.toggle("animate-entry", animateEntry);
   const visible = currentFilter === "selected"
     ? [...selectedPhotosById.values()]
@@ -194,7 +287,19 @@ function renderGallery(animateEntry = false) {
     return;
   }
 
-  const folderTitle = folderTitleMarkup();
+  const folderTitle = currentFilter === "all" ? folderTitleMarkup() : "";
+  const galleryProgress = currentFilter === "selected" ? `
+    <div class="gallery-progress-wrap">
+      <div class="gallery-selection-progress${selectedPhotosById.size === SELECTION_LIMIT ? " limit-reached" : ""}${selectedPhotosById.size > SELECTION_LIMIT ? " exceeded" : ""}"
+        role="progressbar" aria-label="Selection progress" aria-valuemin="0"
+        aria-valuemax="${SELECTION_LIMIT}" aria-valuenow="${selectedPhotosById.size}">
+        <span style="width:${Math.min(selectedPhotosById.size / SELECTION_LIMIT, 1) * 100}%"></span>
+      </div>
+      <div class="gallery-progress-labels">
+        <span class="gallery-progress-selected">${selectedPhotosById.size} Photos selected</span>
+        <span>Max limit : ${SELECTION_LIMIT} Photos</span>
+      </div>
+    </div>` : "";
 
   const folderCards = currentFilter === "all" ? driveFolders.map(folder => `
     <article class="photo-card folder-card" data-folder-id="${folder.id}">
@@ -219,8 +324,9 @@ function renderGallery(animateEntry = false) {
     ? `<button class="load-more" type="button" ${loading ? "disabled" : ""}>${loading ? "Loading…" : "Load More"}</button>`
     : "";
 
-  gallery.innerHTML = folderTitle + folderCards + cards + empty + loadMore;
+  gallery.innerHTML = folderTitle + galleryProgress + folderCards + cards + empty + loadMore;
   updateCounts();
+  updateAlbumGlass();
   if (animateEntry) {
     window.setTimeout(() => gallery.classList.remove("animate-entry"), 360);
   }
@@ -276,7 +382,7 @@ function preloadDriveFolder(folderId) {
       photos: photoData.files.map(file => ({
         id: file.id,
         name: file.name,
-        src: `https://drive.google.com/thumbnail?id=${file.id}&sz=w1200`
+        src: driveThumbnailUrl(file.id, TILE_THUMBNAIL_WIDTH)
       })),
       nextPageToken: photoData.nextPageToken || null
     };
@@ -355,7 +461,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
     const newPhotos = data.files.map(file => ({
       id: file.id,
       name: file.name,
-      src: `https://drive.google.com/thumbnail?id=${file.id}&sz=w1200`,
+      src: driveThumbnailUrl(file.id, TILE_THUMBNAIL_WIDTH),
       selected: selectedPhotosById.has(file.id)
     }));
     photos.push(...newPhotos);
@@ -384,6 +490,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
 
 async function loadDriveFolder(folderId) {
   currentDriveFolderId = folderId;
+  updateBottomFolderIcon();
   photos.length = 0;
   driveFolders.length = 0;
   nextPageToken = null;
@@ -393,6 +500,7 @@ async function loadDriveFolder(folderId) {
 
   const cached = folderCache.get(folderId);
   if (cached) {
+    if (!driveFolderNames.has(folderId)) await fetchDriveFolderName(folderId);
     driveFolders.push(...cached.folders);
     photos.push(...cached.photos.map(photo => ({
       ...photo,
@@ -470,8 +578,7 @@ gallery.addEventListener("click", event => {
   const showLimitWarning = photo.selected && selectedPhotosById.size === SELECTION_LIMIT + 1;
 
   if (currentFilter === "selected" && !photo.selected) {
-    card.remove();
-    if (!selectedPhotosById.size) renderGallery();
+    animateSelectionRemoval(card);
   } else {
     card.classList.toggle("selected", photo.selected);
     heartButton.setAttribute("aria-pressed", String(photo.selected));
@@ -495,6 +602,25 @@ bottomFolderBack.addEventListener("pointerdown", () => {
 });
 
 bottomFolderBack.addEventListener("click", () => {
+  if (currentFilter === "selected") {
+    currentFilter = "all";
+    filters.forEach(button => {
+      const isActive = button.dataset.filter === "all";
+      button.classList.toggle("active", isActive);
+      button.disabled = isActive;
+    });
+    document.querySelector(".filter-control").classList.remove("selections-active");
+    folderHistory.length = 0;
+    window.history.replaceState({
+      galleryFolderId: DRIVE_FOLDER_ID,
+      folderTrail: []
+    }, "");
+
+    if (currentDriveFolderId === DRIVE_FOLDER_ID) renderGallery(true);
+    else loadDriveFolder(DRIVE_FOLDER_ID);
+    return;
+  }
+
   if (!folderHistory.length) return;
 
   const parent = folderHistory.pop();
@@ -529,10 +655,14 @@ lightboxHeart.addEventListener("click", () => {
 
   const card = gallery.querySelector(`[data-id="${CSS.escape(photo.id)}"]`);
   if (card) {
-    card.classList.toggle("selected", photo.selected);
-    const cardHeart = card.querySelector(".heart");
-    cardHeart.setAttribute("aria-pressed", String(photo.selected));
-    cardHeart.setAttribute("aria-label", `${photo.selected ? "Remove from" : "Add to"} selections`);
+    if (currentFilter === "selected" && !photo.selected) {
+      animateSelectionRemoval(card);
+    } else {
+      card.classList.toggle("selected", photo.selected);
+      const cardHeart = card.querySelector(".heart");
+      cardHeart.setAttribute("aria-pressed", String(photo.selected));
+      cardHeart.setAttribute("aria-label", `${photo.selected ? "Remove from" : "Add to"} selections`);
+    }
   }
   updateCounts();
   if (showLimitWarning) {
@@ -579,6 +709,7 @@ filters.forEach(button => button.addEventListener("click", () => {
   if (button.dataset.filter === currentFilter) return;
   const preservedScrollY = window.scrollY;
   currentFilter = button.dataset.filter;
+  updateBottomFolderIcon();
   filters.forEach(item => {
     const isActive = item === button;
     item.classList.toggle("active", isActive);
@@ -586,7 +717,7 @@ filters.forEach(button => button.addEventListener("click", () => {
   });
   document.querySelector(".filter-control").classList.toggle("selections-active", currentFilter === "selected");
   gallery.style.removeProperty("min-height");
-  renderGallery();
+  renderGallery(true);
   const maximumScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
   window.scrollTo(0, Math.min(preservedScrollY, maximumScroll));
 }));
@@ -603,6 +734,7 @@ document.querySelector(".header-submit").addEventListener("click", () => {
   summaryLimitTotal.textContent = SELECTION_LIMIT;
   selectionProgress.setAttribute("aria-valuemax", String(SELECTION_LIMIT));
   selectionProgress.setAttribute("aria-valuenow", String(selectedPhotos.length));
+  selectionProgress.classList.toggle("limit-reached", selectedPhotos.length === SELECTION_LIMIT);
   selectionProgress.classList.toggle("exceeded", selectedPhotos.length > SELECTION_LIMIT);
   selectionProgressFill.style.width = `${Math.min(selectedPhotos.length / SELECTION_LIMIT, 1) * 100}%`;
   summaryYes.disabled = selectedPhotos.length > SELECTION_LIMIT;
