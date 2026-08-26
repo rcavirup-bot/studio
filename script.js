@@ -25,6 +25,7 @@ const selectionCountBadge = document.querySelector(".selection-count");
 const filters = document.querySelectorAll(".filter-button");
 const lightbox = document.querySelector("#lightbox");
 const lightboxImage = document.querySelector("#lightbox-image");
+const lightboxImageStage = document.querySelector(".lightbox-image-stage");
 const lightboxCaption = document.querySelector("#lightbox-caption");
 const lightboxHeart = document.querySelector(".lightbox-heart");
 const previousPhoto = document.querySelector("#previous-photo");
@@ -54,6 +55,22 @@ let totalDrivePhotos = null;
 let currentDriveFolderId = DRIVE_FOLDER_ID;
 let lightboxPhotoList = photos;
 let suppressNextFolderPop = false;
+let lightboxAspectRatio = 3 / 2;
+let modalScrollY = 0;
+let lightboxLoadVersion = 0;
+
+const autoLoadObserver = new IntersectionObserver(entries => {
+  const sentinel = entries.find(entry => entry.isIntersecting)?.target;
+  if (!sentinel || loading || currentFilter !== "all" || !nextPageToken) return;
+  sentinel.classList.add("is-loading");
+  fetchDrivePhotos(nextPageToken, currentDriveFolderId);
+}, { threshold: .1 });
+
+function observeAutoLoadSentinel() {
+  autoLoadObserver.disconnect();
+  const sentinel = gallery.querySelector(".load-more-sentinel");
+  if (sentinel) autoLoadObserver.observe(sentinel);
+}
 
 window.history.replaceState({
   galleryFolderId: DRIVE_FOLDER_ID,
@@ -86,6 +103,22 @@ document.addEventListener("click", event => {
 
 const albumSelector = document.querySelector(".album-selector");
 const siteHeader = document.querySelector(".site-header");
+const bottomBar = document.querySelector(".bottom-bar");
+const filterControl = document.querySelector(".filter-control");
+const desktopToolbarQuery = window.matchMedia("(min-width: 900px)");
+
+function syncFilterPlacement() {
+  if (desktopToolbarQuery.matches) {
+    albumSelector.insertBefore(bottomFolderBack, albumSelector.firstChild);
+    albumSelector.insertBefore(filterControl, albumSelector.querySelector(".header-submit"));
+  } else {
+    bottomBar.appendChild(bottomFolderBack);
+    bottomBar.appendChild(filterControl);
+  }
+}
+
+desktopToolbarQuery.addEventListener("change", syncFilterPlacement);
+syncFilterPlacement();
 
 function updateAlbumGlass() {
   albumSelector.classList.toggle("scrolled", window.scrollY > 4);
@@ -96,9 +129,37 @@ function updateAlbumGlass() {
   }
 }
 
-window.addEventListener("scroll", updateAlbumGlass, { passive: true });
+function clampShortMobileGallery() {
+  if (desktopToolbarQuery.matches || !gallery.classList.contains("short-content")) return;
+  const stackedScrollTop = Math.max(albumSelector.offsetTop - siteHeader.offsetHeight, 0);
+  if (window.scrollY > stackedScrollTop) window.scrollTo(0, stackedScrollTop);
+}
 
-window.addEventListener("resize", updateAlbumGlass);
+function updateShortGalleryState() {
+  gallery.classList.remove("short-content");
+  if (desktopToolbarQuery.matches || (currentFilter === "all" && nextPageToken)) return;
+
+  const galleryRect = gallery.getBoundingClientRect();
+  const styles = getComputedStyle(gallery);
+  const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+  const contentElements = [...gallery.children].filter(element => !element.classList.contains("load-more-sentinel"));
+  const contentBottom = contentElements.length
+    ? Math.max(...contentElements.map(element => element.getBoundingClientRect().bottom)) - galleryRect.top + paddingBottom
+    : 0;
+  const availableHeight = window.innerHeight - siteHeader.offsetHeight - albumSelector.offsetHeight;
+  gallery.classList.toggle("short-content", contentBottom <= availableHeight + 1);
+}
+
+window.addEventListener("scroll", () => {
+  updateAlbumGlass();
+  clampShortMobileGallery();
+}, { passive: true });
+
+window.addEventListener("resize", () => {
+  updateAlbumGlass();
+  gallery.style.setProperty("--mobile-stacked-bars-height", `${siteHeader.offsetHeight + albumSelector.offsetHeight}px`);
+  updateShortGalleryState();
+});
 updateAlbumGlass();
 
 const heartIcon = `
@@ -163,16 +224,66 @@ function updateCounts() {
 
 function showSelectionLimitDialog() {
   document.querySelector("#limit-value").textContent = SELECTION_LIMIT;
-  document.body.classList.add("modal-open");
+  prepareModalBackdrop();
   void document.body.offsetHeight;
   limitDialog.showModal();
+}
+
+function prepareModalBackdrop() {
+  modalScrollY = window.scrollY;
+  document.documentElement.style.setProperty("--modal-scroll-offset", `${-modalScrollY}px`);
+  document.body.classList.add("modal-open");
+}
+
+function sizeLightboxStage(aspectRatio = lightboxAspectRatio) {
+  lightboxAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 3 / 2;
+  const desktopView = window.matchMedia("(min-width: 900px)").matches;
+  const maxWidth = desktopView
+    ? Math.min(window.innerWidth - 180, 1500)
+    : Math.min(window.innerWidth - 36, 1200);
+  const maxHeight = desktopView
+    ? Math.max(180, Math.min(window.innerHeight * .84, window.innerHeight - 120))
+    : Math.max(180, Math.min(window.innerHeight * .58, window.innerHeight - 300));
+  let width = maxWidth;
+  let height = width / lightboxAspectRatio;
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * lightboxAspectRatio;
+  }
+
+  lightboxImageStage.style.width = `${Math.max(width, 1)}px`;
+  lightboxImageStage.style.height = `${Math.max(height, 1)}px`;
+  lightboxImageStage.style.aspectRatio = String(lightboxAspectRatio);
 }
 
 function updateLightbox() {
   const photo = lightboxPhotoList[currentPhotoIndex];
   if (!photo) return;
-  lightboxImage.src = driveThumbnailUrl(photo.id, FULL_VIEW_WIDTH);
+  const loadVersion = ++lightboxLoadVersion;
+  const tileImage = gallery.querySelector(`[data-id="${CSS.escape(photo.id)}"] .photo-wrap img`);
+  const tileRatio = tileImage?.naturalWidth && tileImage?.naturalHeight
+    ? tileImage.naturalWidth / tileImage.naturalHeight
+    : photo.aspectRatio || 3 / 2;
+  photo.aspectRatio = tileRatio;
+  sizeLightboxStage(tileRatio);
+  lightboxImageStage.classList.remove("loaded");
+  lightboxImageStage.style.backgroundImage = `url("${photo.src}")`;
+  lightboxImage.src = photo.src;
   lightboxImage.alt = photo.name;
+
+  const fullViewSource = driveThumbnailUrl(photo.id, FULL_VIEW_WIDTH);
+  const fullViewPreloader = new Image();
+  fullViewPreloader.onload = async () => {
+    try {
+      await fullViewPreloader.decode();
+    } catch (_) {
+      // The loaded image remains usable when decode() is unavailable.
+    }
+    if (loadVersion !== lightboxLoadVersion || lightboxPhotoList[currentPhotoIndex]?.id !== photo.id) return;
+    lightboxImage.src = fullViewSource;
+  };
+  fullViewPreloader.src = fullViewSource;
   lightboxCaption.textContent = photo.name;
   lightboxHeart.innerHTML = heartIcon;
   lightboxHeart.setAttribute("aria-pressed", String(photo.selected));
@@ -183,6 +294,14 @@ function updateLightbox() {
   const displayedTotal = currentFilter === "selected" ? lightboxPhotoList.length : (totalDrivePhotos ?? photos.length);
   lightboxCount.textContent = `${currentPhotoIndex + 1}/${displayedTotal}${currentFilter === "all" && totalDrivePhotos === null && nextPageToken ? "+" : ""}`;
 }
+
+lightboxImage.addEventListener("load", () => {
+  lightboxImageStage.classList.add("loaded");
+});
+
+window.addEventListener("resize", () => {
+  if (lightbox.open) sizeLightboxStage();
+});
 
 async function countDrivePhotos(folderId = currentDriveFolderId) {
   if (!GOOGLE_DRIVE_API_KEY) return;
@@ -224,6 +343,14 @@ function photoCardMarkup(photo) {
       </div>
       <p class="filename">${photo.name}</p>
     </article>`;
+}
+
+function animateHeartToggle(button) {
+  if (!button) return;
+  button.classList.remove("is-toggling");
+  void button.offsetWidth;
+  button.classList.add("is-toggling");
+  window.setTimeout(() => button.classList.remove("is-toggling"), 240);
 }
 
 function folderTitleMarkup() {
@@ -279,6 +406,7 @@ function animateSelectionRemoval(card) {
 function renderGallery(animateEntry = false) {
   updateBottomFolderIcon();
   gallery.classList.toggle("animate-entry", animateEntry);
+  gallery.classList.toggle("showing-selections", currentFilter === "selected");
   const visible = currentFilter === "selected"
     ? [...selectedPhotosById.values()]
     : photos;
@@ -321,10 +449,13 @@ function renderGallery(animateEntry = false) {
       ? `<p class="empty-state empty-folder-state">No items.</p>`
       : "";
   const loadMore = currentFilter === "all" && nextPageToken
-    ? `<button class="load-more" type="button" ${loading ? "disabled" : ""}>${loading ? "Loading…" : "Load More"}</button>`
+    ? `<div class="load-more-sentinel${loading ? " is-loading" : ""}" role="status" aria-live="polite"><span aria-hidden="true"></span><p>Loading more photos…</p></div>`
     : "";
 
   gallery.innerHTML = folderTitle + galleryProgress + folderCards + cards + empty + loadMore;
+  gallery.style.setProperty("--mobile-stacked-bars-height", `${siteHeader.offsetHeight + albumSelector.offsetHeight}px`);
+  updateShortGalleryState();
+  observeAutoLoadSentinel();
   updateCounts();
   updateAlbumGlass();
   if (animateEntry) {
@@ -372,7 +503,7 @@ function preloadDriveFolder(folderId) {
       if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
       return response.json();
     }),
-    fetch(`https://www.googleapis.com/drive/v3/files?${makeParams(photoQuery, PAGE_SIZE, "nextPageToken,files(id,name,mimeType)")}`).then(response => {
+    fetch(`https://www.googleapis.com/drive/v3/files?${makeParams(photoQuery, PAGE_SIZE, "nextPageToken,files(id,name,mimeType,imageMediaMetadata(width,height))")}`).then(response => {
       if (!response.ok) throw new Error(`Google Drive returned ${response.status}`);
       return response.json();
     })
@@ -382,7 +513,10 @@ function preloadDriveFolder(folderId) {
       photos: photoData.files.map(file => ({
         id: file.id,
         name: file.name,
-        src: driveThumbnailUrl(file.id, TILE_THUMBNAIL_WIDTH)
+        src: driveThumbnailUrl(file.id, TILE_THUMBNAIL_WIDTH),
+        aspectRatio: file.imageMediaMetadata?.width && file.imageMediaMetadata?.height
+          ? file.imageMediaMetadata.width / file.imageMediaMetadata.height
+          : undefined
       })),
       nextPageToken: photoData.nextPageToken || null
     };
@@ -400,7 +534,7 @@ function preloadDriveFolder(folderId) {
 function cacheCurrentFolder() {
   folderCache.set(currentDriveFolderId, {
     folders: driveFolders.map(folder => ({ ...folder })),
-    photos: photos.map(({ id, name, src }) => ({ id, name, src })),
+    photos: photos.map(({ id, name, src, aspectRatio }) => ({ id, name, src, aspectRatio })),
     nextPageToken
   });
 }
@@ -437,11 +571,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
   const isAppending = Boolean(pageToken);
   loading = true;
   if (shouldRender && isAppending) {
-    const loadMoreButton = gallery.querySelector(".load-more");
-    if (loadMoreButton) {
-      loadMoreButton.disabled = true;
-      loadMoreButton.textContent = "Loading…";
-    }
+    gallery.querySelector(".load-more-sentinel")?.classList.add("is-loading");
   }
 
   const query = `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`;
@@ -450,7 +580,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
     q: query,
     pageSize: PAGE_SIZE,
     orderBy: "name_natural",
-    fields: "nextPageToken,files(id,name,mimeType)"
+    fields: "nextPageToken,files(id,name,mimeType,imageMediaMetadata(width,height))"
   });
   if (pageToken) params.set("pageToken", pageToken);
 
@@ -462,16 +592,19 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
       id: file.id,
       name: file.name,
       src: driveThumbnailUrl(file.id, TILE_THUMBNAIL_WIDTH),
+      aspectRatio: file.imageMediaMetadata?.width && file.imageMediaMetadata?.height
+        ? file.imageMediaMetadata.width / file.imageMediaMetadata.height
+        : undefined,
       selected: selectedPhotosById.has(file.id)
     }));
     photos.push(...newPhotos);
     nextPageToken = data.nextPageToken || null;
 
     if (shouldRender && isAppending) {
-      gallery.querySelector(".load-more")?.remove();
+      gallery.querySelector(".load-more-sentinel")?.remove();
       gallery.insertAdjacentHTML("beforeend", newPhotos.map(photoCardMarkup).join(""));
       if (nextPageToken) {
-        gallery.insertAdjacentHTML("beforeend", `<button class="load-more" type="button">Load More</button>`);
+        gallery.insertAdjacentHTML("beforeend", `<div class="load-more-sentinel" role="status" aria-live="polite"><span aria-hidden="true"></span><p>Loading more photos…</p></div>`);
       }
       updateCounts();
     }
@@ -482,6 +615,7 @@ async function fetchDrivePhotos(pageToken = "", folderId = currentDriveFolderId,
   }
 
   loading = false;
+  observeAutoLoadSentinel();
   if (shouldRender && !isAppending) {
     renderGallery();
   }
@@ -526,7 +660,7 @@ async function loadDriveFolder(folderId) {
   ]);
   folderCache.set(folderId, {
     folders: driveFolders.map(folder => ({ ...folder })),
-    photos: photos.map(({ id, name, src }) => ({ id, name, src })),
+    photos: photos.map(({ id, name, src, aspectRatio }) => ({ id, name, src, aspectRatio })),
     nextPageToken
   });
   renderGallery(true);
@@ -534,11 +668,6 @@ async function loadDriveFolder(folderId) {
 }
 
 gallery.addEventListener("click", event => {
-  if (event.target.closest(".load-more")) {
-    fetchDrivePhotos(nextPageToken, currentDriveFolderId);
-    return;
-  }
-
   const folderCard = event.target.closest(".folder-card");
   if (folderCard) {
     cacheCurrentFolder();
@@ -563,6 +692,7 @@ gallery.addEventListener("click", event => {
     currentPhotoIndex = lightboxPhotoList.indexOf(photo);
     updateLightbox();
     lightbox.showModal();
+    lightbox.focus({ preventScroll: true });
     document.body.classList.add("lightbox-open");
     return;
   }
@@ -576,6 +706,7 @@ gallery.addEventListener("click", event => {
   if (photo.selected) selectedPhotosById.set(photo.id, photo);
   else selectedPhotosById.delete(photo.id);
   const showLimitWarning = photo.selected && selectedPhotosById.size === SELECTION_LIMIT + 1;
+  animateHeartToggle(heartButton);
 
   if (currentFilter === "selected" && !photo.selected) {
     animateSelectionRemoval(card);
@@ -591,17 +722,41 @@ gallery.addEventListener("click", event => {
   }
 });
 
+let backButtonHoldTimer = null;
+let ignoreNextBackClick = false;
+
 bottomFolderBack.addEventListener("pointerdown", () => {
   bottomFolderBack.classList.add("pressing");
+  if (currentFilter !== "all" || !folderHistory.length) return;
+
+  backButtonHoldTimer = window.setTimeout(() => {
+    backButtonHoldTimer = null;
+    ignoreNextBackClick = true;
+    folderHistory.length = 0;
+    window.history.replaceState({
+      galleryFolderId: DRIVE_FOLDER_ID,
+      folderTrail: []
+    }, "");
+    loadDriveFolder(DRIVE_FOLDER_ID);
+  }, 550);
 });
 
 ["pointerup", "pointercancel", "pointerleave"].forEach(eventName => {
   bottomFolderBack.addEventListener(eventName, () => {
+    if (backButtonHoldTimer) {
+      window.clearTimeout(backButtonHoldTimer);
+      backButtonHoldTimer = null;
+    }
     bottomFolderBack.classList.remove("pressing");
   });
 });
 
 bottomFolderBack.addEventListener("click", () => {
+  if (ignoreNextBackClick) {
+    ignoreNextBackClick = false;
+    return;
+  }
+
   if (currentFilter === "selected") {
     currentFilter = "all";
     filters.forEach(button => {
@@ -652,6 +807,7 @@ lightboxHeart.addEventListener("click", () => {
   const showLimitWarning = photo.selected && selectedPhotosById.size === SELECTION_LIMIT + 1;
   lightboxHeart.setAttribute("aria-pressed", String(photo.selected));
   lightboxHeart.setAttribute("aria-label", `${photo.selected ? "Remove from" : "Add to"} selections`);
+  animateHeartToggle(lightboxHeart);
 
   const card = gallery.querySelector(`[data-id="${CSS.escape(photo.id)}"]`);
   if (card) {
@@ -696,12 +852,35 @@ nextPhoto.addEventListener("click", async () => {
   }
 });
 
+document.addEventListener("keydown", event => {
+  if (!lightbox.open) return;
+
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    previousPhoto.click();
+    return;
+  }
+
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    nextPhoto.click();
+    return;
+  }
+
+  if (event.code === "Space") {
+    event.preventDefault();
+    if (!event.repeat) lightboxHeart.click();
+  }
+});
+
 document.querySelector(".lightbox-close").addEventListener("click", () => lightbox.close());
 
 lightbox.addEventListener("cancel", event => event.preventDefault());
 
 lightbox.addEventListener("close", () => {
   lightboxImage.src = "";
+  lightboxImageStage.style.backgroundImage = "";
+  lightboxImageStage.classList.remove("loaded");
   document.body.classList.remove("lightbox-open");
 });
 
@@ -738,7 +917,7 @@ document.querySelector(".header-submit").addEventListener("click", () => {
   selectionProgress.classList.toggle("exceeded", selectedPhotos.length > SELECTION_LIMIT);
   selectionProgressFill.style.width = `${Math.min(selectedPhotos.length / SELECTION_LIMIT, 1) * 100}%`;
   summaryYes.disabled = selectedPhotos.length > SELECTION_LIMIT;
-  document.body.classList.add("modal-open");
+  prepareModalBackdrop();
   void document.body.offsetHeight;
   summaryDialog.showModal();
 });
@@ -752,7 +931,7 @@ summaryYes.addEventListener("click", () => {
 });
 document.querySelector(".limit-ok").addEventListener("click", () => limitDialog.close());
 document.querySelector(".header-logout").addEventListener("click", () => {
-  document.body.classList.add("modal-open");
+  prepareModalBackdrop();
   void document.body.offsetHeight;
   logoutDialog.showModal();
 });
@@ -760,12 +939,13 @@ document.querySelector(".logout-no").addEventListener("click", () => logoutDialo
 document.querySelector(".logout-yes").addEventListener("click", () => {
   logoutDialog.close();
   document.dispatchEvent(new CustomEvent("gallery:logout-confirmed"));
+  window.location.href = "login.html";
 });
 
 document.querySelector(".header-info").addEventListener("click", () => {
   tutorialVideo.src = "";
   tutorialVideoWrap.classList.remove("playing");
-  document.body.classList.add("modal-open");
+  prepareModalBackdrop();
   void document.body.offsetHeight;
   infoDialog.showModal();
 });
@@ -786,6 +966,8 @@ infoDialog.addEventListener("close", () => {
   dialog.addEventListener("close", () => {
     if (!summaryDialog.open && !limitDialog.open && !logoutDialog.open && !infoDialog.open) {
       document.body.classList.remove("modal-open");
+      document.documentElement.style.removeProperty("--modal-scroll-offset");
+      window.scrollTo(0, modalScrollY);
     }
   });
 });

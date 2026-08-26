@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#102b60">
+  <title>Login — Prantik Photography</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    html {
+      min-height: 100%;
+      background: #beddf1;
+    }
+
+    body {
+      position: relative;
+      min-width: 320px;
+      min-height: 100svh;
+      margin: 0;
+      color: #17293b;
+      background:
+        radial-gradient(ellipse at 8% 8%, rgba(229, 243, 251, .94) 0%, rgba(218, 238, 248, .66) 25%, transparent 51%),
+        radial-gradient(ellipse at 91% 9%, rgba(171, 205, 230, .72) 0%, rgba(200, 224, 240, .42) 30%, transparent 58%),
+        radial-gradient(ellipse at 88% 88%, rgba(210, 197, 235, .42) 0%, rgba(226, 217, 243, .2) 34%, transparent 61%),
+        radial-gradient(ellipse at 12% 86%, rgba(174, 222, 220, .4) 0%, rgba(207, 238, 235, .2) 33%, transparent 59%),
+        radial-gradient(ellipse at 52% 48%, rgba(223, 239, 248, .58) 0%, rgba(184, 211, 228, .24) 38%, transparent 67%),
+        linear-gradient(135deg, #f1f8fc 0%, #d8eaf5 48%, #c2dced 100%);
+      background-attachment: scroll;
+      background-size: cover;
+      font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    button,
+    input { font: inherit; }
+
+    .login-main {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+    }
+
+.login-card {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 18px 18px;
+      border: 1.5px solid transparent;
+      border-radius: 27px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, .8), rgba(238, 247, 253, .68)) padding-box,
+        linear-gradient(145deg, rgba(255, 255, 255, .98) 0%, rgba(255, 255, 255, .62) 48%, rgba(91, 132, 164, .42) 100%) border-box;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .98),
+        inset 1px 0 0 rgba(255, 255, 255, .52),
+        inset 0 -1px 0 rgba(66, 98, 125, .13),
+        0 14px 32px rgba(27, 61, 91, .17),
+        0 30px 62px rgba(25, 57, 88, .14);
+      -webkit-backdrop-filter: blur(30px) saturate(145%);
+      backdrop-filter: blur(30px) saturate(145%);
+    }
+
+    .login-stack {
+      position: relative;
+      width: min(calc(100% - 14px), 365px);
+    }
+
+    .powered-by {
+      position: fixed;
+      z-index: 3;
+      top: auto;
+      bottom: max(28px, env(safe-area-inset-bottom));
+      left: 50%;
+      width: max-content;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      gap: 7px;
+      color: rgba(29, 52, 72, .58);
+      font-size: 15px;
+      line-height: 1;
+      transform: translateX(-50%);
+    }
+
+    .powered-by img {
+      display: block;
+      width: 82px;
+      height: auto;
+    }
+
+    .powered-by a {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .login-card h2 {
+      margin: 0 0 5px;
+      text-align: center;
+      font-size: 24px;
+    }
+
+    .welcome-period { color: #ef3349; }
+
+    .card-logo {
+      height: 118px;
+      margin: -12px -6px 25px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      background: linear-gradient(
+        120deg,
+        #52675f,
+        #17666d,
+        #285c86,
+        #59417e,
+        #823f55,
+        #9a5837,
+        #17666d,
+        #52675f
+      );
+      background-size: 500% 500%;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .22),
+        0 8px 18px rgba(17, 39, 53, .16);
+      animation: logo-gradient-flow 14s ease-in-out infinite;
+    }
+
+    @keyframes logo-gradient-flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .card-logo img {
+      display: block;
+      width: 156px;
+      height: auto;
+    }
+
+    .login-card > p {
+      margin: 0 0 25px;
+      color: rgba(38, 58, 76, .62);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      padding-left: 7px;
+      color: rgba(20, 39, 55, .78);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .input-wrap {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 15px;
+      border: 1px solid rgba(74, 108, 136, .25);
+      border-radius: 12px;
+      background: #eaf2f8;
+      box-shadow: inset 0 1px 2px rgba(30, 62, 88, .06);
+      transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+
+    .input-wrap:focus-within {
+      border-color: #3974c9;
+      background: #f5f9fc;
+      box-shadow: 0 0 0 3px rgba(50, 106, 194, .13);
+    }
+
+    .input-wrap svg {
+      flex: 0 0 auto;
+      width: 21px;
+      height: 21px;
+      fill: none;
+      stroke: #315781;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: .72;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      min-width: 0;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      color: #15283b;
+      background: transparent;
+      font-size: 16px;
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+
+    .input-wrap input::placeholder { color: rgba(48, 70, 88, .42); }
+
+    .login-button {
+      position: relative;
+      width: 100%;
+      height: 48px;
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      border: 0;
+      border-radius: 12px;
+      color: #fff;
+      background: linear-gradient(120deg, #3b78d4, #17458e);
+      box-shadow: 0 9px 20px rgba(24, 68, 138, .27), inset 0 1px 0 rgba(255, 255, 255, .2);
+      font-weight: 700;
+      letter-spacing: normal;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform .16s ease, filter .2s ease;
+    }
+
+    .login-button svg {
+      position: static;
+      width: 21px;
+      height: 21px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .forgot-password {
+      width: max-content;
+      height: 56px;
+      margin: 0 auto 0 7px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 0;
+      color: #285fae;
+      background: transparent;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .forgot-password:active { opacity: .62; }
+
+    .login-button:active { transform: scale(.98); }
+    .login-button:hover { filter: brightness(1.06); }
+
+    .login-card > .login-note {
+      margin: 18px 0 0;
+      color: rgba(38, 58, 76, .48);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 899px) {
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .login-main {
+        height: 100%;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .login-card {
+        transform: translateY(-28px);
+      }
+    }
+
+    @media (min-width: 900px) {
+      body,
+      .login-main {
+        min-height: 100dvh;
+      }
+
+      body {
+        background-attachment: fixed;
+      }
+
+      .login-main {
+        padding: 40px;
+      }
+
+      .login-stack {
+        width: min(calc(100% - 40px), 704px);
+      }
+
+      .login-card {
+        display: grid;
+        grid-template-columns: minmax(0, 300px) minmax(0, 360px);
+        column-gap: 14px;
+        align-items: center;
+        padding: 14px;
+        border-radius: 24px;
+      }
+
+      .login-card > :not(.card-logo) {
+        grid-column: 2;
+        width: min(100%, 360px);
+        justify-self: center;
+      }
+
+      .card-logo {
+        grid-column: 1;
+        grid-row: 1 / span 7;
+        align-self: stretch;
+        min-height: 520px;
+        height: auto;
+        margin: 0;
+        border-radius: 10px;
+      }
+
+      .card-logo img {
+        width: min(68%, 275px);
+      }
+
+      .login-card h2 {
+        align-self: end;
+        margin: 54px 0 7px;
+        font-size: 32px;
+        transform: translateY(-14px);
+      }
+
+      .login-card > p {
+        margin-bottom: 30px;
+        font-size: 15px;
+      }
+
+      .login-card > h2 + p {
+        transform: translateY(-14px);
+      }
+
+      .field {
+        width: 100%;
+      }
+
+      .forgot-password {
+        margin-left: 0;
+        padding-left: 7px;
+        justify-items: start;
+      }
+
+      .login-card > .login-note {
+        align-self: start;
+        margin: 20px 8px 36px;
+      }
+    }
+
+    @media (min-width: 900px) and (max-height: 720px) {
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .login-main {
+        height: 100%;
+        min-height: 0;
+        padding: 12px 24px;
+        overflow: hidden;
+      }
+
+      .login-stack {
+        width: min(calc(100% - 24px), 630px);
+      }
+
+      .login-card {
+        grid-template-columns: minmax(0, 265px) minmax(0, 325px);
+        column-gap: 12px;
+        padding: 10px;
+        border-radius: 20px;
+        transform: scale(var(--tablet-login-scale, 1));
+        transform-origin: center;
+      }
+
+      .card-logo {
+        min-height: 390px;
+        border-radius: 10px;
+      }
+
+      .card-logo img {
+        width: min(66%, 205px);
+      }
+
+      .login-card > :not(.card-logo) {
+        width: min(100%, 325px);
+      }
+
+      .login-card h2 {
+        margin: 12px 0 4px;
+        font-size: 27px;
+        transform: none;
+      }
+
+      .login-card > h2 + p {
+        margin-bottom: 16px;
+        font-size: 13px;
+        transform: none;
+      }
+
+      .field {
+        gap: 5px;
+        margin-bottom: 9px;
+      }
+
+      .field label { font-size: 12px; }
+
+      .input-wrap,
+      .login-button {
+        height: 42px;
+      }
+
+      .forgot-password {
+        height: 38px;
+        font-size: 13px;
+      }
+
+      .login-card > .login-note {
+        margin: 11px 6px 8px;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .powered-by {
+        bottom: max(8px, env(safe-area-inset-bottom));
+        padding: 14px 0 9px;
+        font-size: 12px;
+      }
+
+      .powered-by img { width: 68px; }
+    }
+
+    @media (max-width: 380px) {
+      .login-main { padding-inline: 14px; }
+      .login-card { padding: 25px 18px 18px; border-radius: 25px; }
+      .login-card h2 { font-size: 23px; }
+      .input-wrap,
+      .login-button { height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="login-main">
+    <div class="login-stack">
+      <form class="login-card" id="login-form">
+      <div class="card-logo">
+        <img src="https://ik.imagekit.io/d3ycnoiwd/PrantikWebsite/logo.png" alt="Prantik Photography">
+      </div>
+      <h2>Welcome<span class="welcome-period">.</span></h2>
+      <p>Enter your details to access your photos.</p>
+
+      <div class="field">
+        <label for="mobile-number">Mobile number</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M10 17h4"/></svg>
+          <input id="mobile-number" name="mobile" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Enter mobile number" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
+        </div>
+      </div>
+
+      <button class="forgot-password" type="button">Forgot password?</button>
+      <button class="login-button" type="submit">
+        <span>Sign In</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+      <p class="login-note">Your photos are private and accessible only with the details provided to you.</p>
+      </form>
+      <div class="powered-by">
+        <span>Powered by</span>
+        <a href="https://pixelsetu.com" target="_blank" rel="noopener noreferrer" aria-label="Visit PixelSetu">
+          <img src="https://ik.imagekit.io/d3ycnoiwd/PrantikWebsite/PixelSetu-low.png" alt="PixelSetu">
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const tabletLandscapeQuery = window.matchMedia("(min-width: 900px) and (max-height: 720px)");
+
+    function syncTabletLoginScale() {
+      if (!tabletLandscapeQuery.matches) {
+        document.documentElement.style.removeProperty("--tablet-login-scale");
+        return;
+      }
+
+      const availableHeight = window.visualViewport?.height || window.innerHeight;
+      const scale = Math.min(1, Math.max(.68, (availableHeight - 128) / 410));
+      document.documentElement.style.setProperty("--tablet-login-scale", scale.toFixed(3));
+    }
+
+    tabletLandscapeQuery.addEventListener("change", syncTabletLoginScale);
+    window.addEventListener("resize", syncTabletLoginScale, { passive: true });
+    window.visualViewport?.addEventListener("resize", syncTabletLoginScale, { passive: true });
+    syncTabletLoginScale();
+
+    document.addEventListener("contextmenu", event => {
+      if (!event.target.closest("input")) event.preventDefault();
+    });
+
+    document.querySelector(".forgot-password").addEventListener("click", () => {
+      document.dispatchEvent(new CustomEvent("login:forgot-password"));
+    });
+
+    document.querySelector("#login-form").addEventListener("submit", event => {
+      event.preventDefault();
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>

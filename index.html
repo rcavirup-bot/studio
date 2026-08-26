@@ -51,11 +51,13 @@
     <section class="gallery" aria-label="Wedding photo gallery" id="gallery"></section>
   </main>
 
-  <dialog class="lightbox" id="lightbox" aria-label="Full-size photograph">
+  <dialog class="lightbox" id="lightbox" aria-label="Full-size photograph" tabindex="-1">
     <button class="lightbox-close" type="button" aria-label="Close photograph">&times;</button>
     <span class="lightbox-count" id="lightbox-count" aria-live="polite">1/100+</span>
     <button class="lightbox-heart" type="button" aria-label="Add to selections" aria-pressed="false"></button>
-    <img id="lightbox-image" src="" alt="">
+    <div class="lightbox-image-stage">
+      <img id="lightbox-image" src="" alt="">
+    </div>
     <p id="lightbox-caption"></p>
     <div class="lightbox-navigation">
       <button id="previous-photo" type="button" aria-label="Previous photograph">
