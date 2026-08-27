@@ -646,9 +646,9 @@ button { font: inherit; }
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(25, 29, 33, .38);
-  -webkit-backdrop-filter: blur(10px) saturate(115%);
-  backdrop-filter: blur(10px) saturate(115%);
+  background: #3b3e42;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   color: rgba(255,255,255,.58);
   cursor: pointer;
   transition: color .28s ease, background-color .28s ease;
@@ -1447,9 +1447,10 @@ button { font: inherit; }
 }
 
 .summary-yes:disabled {
-  color: rgba(49, 72, 93, .48);
-  background: rgba(49, 72, 93, .12);
+  color: rgba(255, 255, 255, .58);
+  background: #748ba9;
   box-shadow: none;
+  opacity: .72;
   cursor: not-allowed;
 }
 
@@ -1659,6 +1660,12 @@ button { font: inherit; }
 }
 
 @media (max-width: 899px) {
+  .bottom-folder-back,
+  .filter-control {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
   .gallery.short-content {
     min-height: calc(100lvh - var(--mobile-stacked-bars-height, 154px));
   }

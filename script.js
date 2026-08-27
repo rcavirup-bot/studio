@@ -886,7 +886,6 @@ lightbox.addEventListener("close", () => {
 
 filters.forEach(button => button.addEventListener("click", () => {
   if (button.dataset.filter === currentFilter) return;
-  const preservedScrollY = window.scrollY;
   currentFilter = button.dataset.filter;
   updateBottomFolderIcon();
   filters.forEach(item => {
@@ -895,10 +894,7 @@ filters.forEach(button => button.addEventListener("click", () => {
     item.disabled = isActive;
   });
   document.querySelector(".filter-control").classList.toggle("selections-active", currentFilter === "selected");
-  gallery.style.removeProperty("min-height");
   renderGallery(true);
-  const maximumScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0);
-  window.scrollTo(0, Math.min(preservedScrollY, maximumScroll));
 }));
 
 filters.forEach(button => {
@@ -916,7 +912,7 @@ document.querySelector(".header-submit").addEventListener("click", () => {
   selectionProgress.classList.toggle("limit-reached", selectedPhotos.length === SELECTION_LIMIT);
   selectionProgress.classList.toggle("exceeded", selectedPhotos.length > SELECTION_LIMIT);
   selectionProgressFill.style.width = `${Math.min(selectedPhotos.length / SELECTION_LIMIT, 1) * 100}%`;
-  summaryYes.disabled = selectedPhotos.length > SELECTION_LIMIT;
+  summaryYes.disabled = selectedPhotos.length === 0 || selectedPhotos.length > SELECTION_LIMIT;
   prepareModalBackdrop();
   void document.body.offsetHeight;
   summaryDialog.showModal();
