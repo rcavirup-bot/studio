@@ -179,13 +179,37 @@
       height: 112px;
       margin: 0 auto 8px;
       display: block;
+      cursor: pointer;
+      transition: scale .16s cubic-bezier(.22, .8, .3, 1);
+      touch-action: manipulation;
+    }
+
+    .welcome-emoji:active,
+    .recovery-emoji:active { scale: .965; }
+
+    .welcome-emoji.is-changing {
+      animation: emoji-change-scale .22s cubic-bezier(.22, .8, .3, 1);
+    }
+
+    .recovery-emoji.is-changing picture {
+      transform-origin: 50% 50%;
+      animation: recovery-emoji-change-scale .22s cubic-bezier(.22, .8, .3, 1);
+    }
+
+    @keyframes emoji-change-scale {
+      0%, 100% { scale: 1; }
+      45% { scale: .965; }
+    }
+
+    @keyframes recovery-emoji-change-scale {
+      0%, 100% { transform: scale(1); }
+      45% { transform: scale(.965); }
     }
 
     .welcome-emoji picture {
       position: absolute;
       inset: 0;
       opacity: 0;
-      transition: opacity .24s ease;
     }
 
     .welcome-emoji .emoji-smile,
@@ -194,6 +218,10 @@
     .welcome-emoji.is-login-error .emoji-smile,
     .welcome-emoji.is-login-error .emoji-peek { opacity: 0; }
     .welcome-emoji.is-login-error .emoji-error { opacity: 1; }
+    .welcome-emoji.is-dizzy .emoji-smile,
+    .welcome-emoji.is-dizzy .emoji-peek,
+    .welcome-emoji.is-dizzy .emoji-error { opacity: 0; }
+    .welcome-emoji.is-dizzy .emoji-dizzy { opacity: 1; }
 
     .welcome-emoji img {
       display: block;
@@ -428,11 +456,18 @@
 
     .login-card.recovery-mode > .recovery-panel {
       display: flex;
+    }
+
+    .login-card.recovery-mode > .recovery-panel .recovery-card {
       animation: recovery-in .34s cubic-bezier(.22, .8, .3, 1) both;
     }
 
-    .login-card.recovery-mode > .recovery-panel.recovery-leaving {
+    .login-card.recovery-mode > .recovery-panel.recovery-leaving .recovery-card {
       animation: recovery-out .26s ease both;
+    }
+
+    .login-card.recovery-mode > .recovery-panel.recovery-leaving .recovery-emoji {
+      animation: recovery-emoji-out .26s ease both;
     }
 
     .login-card.returning-to-login > :not(.card-logo):not(.recovery-panel) {
@@ -440,9 +475,23 @@
     }
 
     .recovery-emoji {
+      position: relative;
       width: 112px;
       height: 112px;
+      cursor: pointer;
+      transition: scale .16s cubic-bezier(.22, .8, .3, 1);
+      touch-action: manipulation;
     }
+
+    .recovery-emoji picture {
+      position: absolute;
+      inset: 0;
+      opacity: 1;
+    }
+
+    .recovery-emoji .emoji-dizzy { opacity: 0; }
+    .recovery-emoji.is-dizzy picture { opacity: 0; }
+    .recovery-emoji.is-dizzy .emoji-dizzy { opacity: 1; }
 
     .recovery-emoji img {
       display: block;
@@ -550,6 +599,11 @@
     @keyframes recovery-out {
       from { opacity: 1; transform: scale(1); }
       to { opacity: 0; transform: scale(.985); }
+    }
+
+    @keyframes recovery-emoji-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
     }
 
     @keyframes sign-in-return {
@@ -807,7 +861,7 @@
       <div class="card-logo">
         <img src="https://ik.imagekit.io/d3ycnoiwd/PrantikWebsite/logo.png" alt="Prantik Photography">
       </div>
-      <div class="welcome-emoji" aria-live="off">
+      <div class="welcome-emoji" role="button" tabindex="0" aria-label="Change emoji temporarily" aria-live="off">
         <picture class="emoji-smile">
           <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.webp" type="image/webp">
           <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f600/512.gif" alt="Smiling face">
@@ -819,6 +873,10 @@
         <picture class="emoji-error">
           <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f629/512.webp" type="image/webp">
           <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f629/512.gif" alt="Distressed face">
+        </picture>
+        <picture class="emoji-dizzy">
+          <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f635/512.webp" type="image/webp">
+          <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f635/512.gif" alt="Dizzy face">
         </picture>
       </div>
       <h2>Welcome<span class="welcome-period">.</span></h2>
@@ -851,10 +909,16 @@
       </button>
       <p class="login-note">Your photos are private and accessible only with the details provided to you.</p>
       <section class="recovery-panel" aria-labelledby="recovery-message">
-        <picture class="recovery-emoji">
-          <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp" type="image/webp">
-          <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.gif" alt="Neutral face">
-        </picture>
+        <div class="recovery-emoji" role="button" tabindex="0" aria-label="Change emoji temporarily">
+          <picture class="emoji-neutral">
+            <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp" type="image/webp">
+            <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.gif" alt="Neutral face">
+          </picture>
+          <picture class="emoji-dizzy">
+            <source srcset="https://fonts.gstatic.com/s/e/notoemoji/latest/1f635/512.webp" type="image/webp">
+            <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f635/512.gif" alt="Dizzy face">
+          </picture>
+        </div>
         <div class="recovery-card">
           <button class="recovery-back-icon" type="button" aria-label="Back to sign in">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h11"/></svg>
@@ -881,21 +945,29 @@
 
     const loginForm = document.querySelector("#login-form");
     const recoveryPanel = document.querySelector(".recovery-panel");
+    const recoveryCard = document.querySelector(".recovery-card");
     const recoveryBackButtons = document.querySelectorAll(".recovery-back-icon, .recovery-back-link");
 
     document.querySelector(".forgot-password").addEventListener("click", () => {
+      restoreDesignatedEmoji(document.querySelector(".welcome-emoji"));
       loginForm.style.setProperty("--login-card-fixed-height", `${loginForm.offsetHeight}px`);
       loginForm.classList.add("recovery-mode");
+      restoreDesignatedEmoji(document.querySelector(".recovery-emoji"));
       document.dispatchEvent(new CustomEvent("login:forgot-password"));
     });
 
     recoveryBackButtons.forEach(button => {
       button.addEventListener("click", () => {
         if (recoveryPanel.classList.contains("recovery-leaving")) return;
+        const recoveryEmoji = document.querySelector(".recovery-emoji");
+        cancelTemporaryEmoji(recoveryEmoji);
+        restoreDesignatedEmoji(document.querySelector(".welcome-emoji"));
         recoveryPanel.classList.add("recovery-leaving");
-        recoveryPanel.addEventListener("animationend", () => {
+        recoveryCard.addEventListener("animationend", event => {
+          if (event.animationName !== "recovery-out") return;
           recoveryPanel.classList.remove("recovery-leaving");
           loginForm.classList.remove("recovery-mode");
+          restoreDesignatedEmoji(recoveryEmoji, false);
           loginForm.classList.add("returning-to-login");
           loginForm.style.removeProperty("--login-card-fixed-height");
           window.setTimeout(() => loginForm.classList.remove("returning-to-login"), 340);
@@ -909,20 +981,78 @@
     const welcomeEmoji = document.querySelector(".welcome-emoji");
     const mobileInput = document.querySelector("#mobile-number");
     const loginStatus = document.querySelector(".welcome-subspace");
+    const emojiRestoreTimers = new WeakMap();
+
+    function animateEmojiChange(emoji) {
+      if (!emoji) return;
+      emoji.classList.remove("is-changing");
+      void emoji.offsetWidth;
+      emoji.classList.add("is-changing");
+    }
+
+    function cancelTemporaryEmoji(emoji) {
+      if (!emoji) return;
+      const existingTimer = emojiRestoreTimers.get(emoji);
+      if (existingTimer) window.clearTimeout(existingTimer);
+      emojiRestoreTimers.delete(emoji);
+      emoji.classList.remove("is-changing");
+    }
+
+    function restoreDesignatedEmoji(emoji, shouldAnimate = true) {
+      if (!emoji) return;
+      cancelTemporaryEmoji(emoji);
+      emoji.classList.remove("is-dizzy");
+      if (shouldAnimate) animateEmojiChange(emoji);
+    }
+
+    document.querySelectorAll(".welcome-emoji, .recovery-emoji").forEach(emoji => {
+      const showTemporaryDizzyEmoji = () => {
+        const existingTimer = emojiRestoreTimers.get(emoji);
+        if (existingTimer) window.clearTimeout(existingTimer);
+        emoji.classList.add("is-dizzy");
+        animateEmojiChange(emoji);
+        emojiRestoreTimers.set(emoji, window.setTimeout(() => {
+          emoji.classList.remove("is-dizzy");
+          animateEmojiChange(emoji);
+          emojiRestoreTimers.delete(emoji);
+        }, 5000));
+      };
+
+      emoji.addEventListener("animationend", event => {
+        if (event.animationName === "emoji-change-scale" ||
+            event.animationName === "recovery-emoji-change-scale") {
+          emoji.classList.remove("is-changing");
+        }
+      });
+
+      emoji.addEventListener("click", showTemporaryDizzyEmoji);
+      emoji.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.code !== "Space") return;
+        event.preventDefault();
+        showTemporaryDizzyEmoji();
+      });
+    });
 
     passwordWrap.addEventListener("focusin", () => {
+      restoreDesignatedEmoji(welcomeEmoji);
       welcomeEmoji.classList.add("is-password-active");
+    });
+
+    mobileInput.addEventListener("focus", () => {
+      restoreDesignatedEmoji(welcomeEmoji);
     });
 
     passwordWrap.addEventListener("focusout", () => {
       requestAnimationFrame(() => {
         if (!passwordWrap.contains(document.activeElement)) {
+          restoreDesignatedEmoji(welcomeEmoji);
           welcomeEmoji.classList.remove("is-password-active");
         }
       });
     });
 
     passwordToggle.addEventListener("click", () => {
+      restoreDesignatedEmoji(welcomeEmoji);
       const shouldShow = passwordInput.type === "password";
       passwordInput.type = shouldShow ? "text" : "password";
       passwordToggle.setAttribute("aria-pressed", String(shouldShow));
@@ -931,6 +1061,7 @@
 
     [mobileInput, passwordInput].forEach(input => {
       input.addEventListener("input", () => {
+        restoreDesignatedEmoji(welcomeEmoji);
         welcomeEmoji.classList.remove("is-login-error");
         loginStatus.classList.remove("is-error");
         mobileInput.removeAttribute("aria-invalid");
@@ -942,6 +1073,7 @@
       event.preventDefault();
       const credentialsAreValid = mobileInput.value.trim() === "1234" && passwordInput.value === "1234";
       if (!credentialsAreValid) {
+        restoreDesignatedEmoji(welcomeEmoji);
         welcomeEmoji.classList.add("is-login-error");
         loginStatus.classList.add("is-error");
         mobileInput.setAttribute("aria-invalid", "true");
