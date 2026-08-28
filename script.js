@@ -905,6 +905,17 @@ filters.forEach(button => button.addEventListener("click", () => {
   });
   document.querySelector(".filter-control").classList.toggle("selections-active", currentFilter === "selected");
   renderGallery(true);
+
+  requestAnimationFrame(() => {
+    const firstContent = currentFilter === "selected"
+      ? gallery.querySelector(".gallery-progress-wrap")
+      : gallery.querySelector(".gallery-folder-title");
+    if (!firstContent) return;
+
+    const stickyOffset = siteHeader.offsetHeight + albumSelector.offsetHeight + 10;
+    const targetTop = firstContent.getBoundingClientRect().top + window.scrollY - stickyOffset;
+    window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  });
 }));
 
 filters.forEach(button => {
