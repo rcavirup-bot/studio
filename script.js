@@ -862,6 +862,18 @@ nextPhoto.addEventListener("click", async () => {
   }
 });
 
+function blockKeysBehindLimitDialog(event) {
+  if (!limitDialog.open) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (event.type === "keydown" && event.key === "Enter" && !event.repeat) {
+    document.querySelector(".limit-ok").click();
+  }
+}
+
+document.addEventListener("keydown", blockKeysBehindLimitDialog, true);
+document.addEventListener("keyup", blockKeysBehindLimitDialog, true);
+
 document.addEventListener("keydown", event => {
   if (!lightbox.open) return;
 
@@ -896,6 +908,11 @@ lightbox.addEventListener("close", () => {
 
 filters.forEach(button => button.addEventListener("click", () => {
   if (button.dataset.filter === currentFilter) return;
+  const enteringSelections = button.dataset.filter === "selected";
+  if (enteringSelections) {
+    gallery.classList.remove("short-content", "animate-entry");
+    gallery.replaceChildren();
+  }
   currentFilter = button.dataset.filter;
   updateBottomFolderIcon();
   filters.forEach(item => {
@@ -907,14 +924,19 @@ filters.forEach(button => button.addEventListener("click", () => {
   renderGallery(true);
 
   requestAnimationFrame(() => {
-    const firstContent = currentFilter === "selected"
+    const topContent = currentFilter === "selected"
       ? gallery.querySelector(".gallery-progress-wrap")
       : gallery.querySelector(".gallery-folder-title");
-    if (!firstContent) return;
+    if (!topContent) return;
 
-    const stickyOffset = siteHeader.offsetHeight + albumSelector.offsetHeight + 10;
-    const targetTop = firstContent.getBoundingClientRect().top + window.scrollY - stickyOffset;
-    window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+    const contentRect = topContent.getBoundingClientRect();
+    const contentIsVisible = contentRect.top >= siteHeader.offsetHeight
+      && contentRect.bottom <= window.innerHeight;
+    if (contentIsVisible) return;
+
+    const stickyHeight = siteHeader.offsetHeight + albumSelector.offsetHeight;
+    const contentTop = contentRect.top + window.scrollY - stickyHeight - 24;
+    window.scrollTo({ top: Math.max(0, contentTop), behavior: "auto" });
   });
 }));
 
