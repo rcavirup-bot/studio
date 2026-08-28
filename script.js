@@ -42,11 +42,21 @@ const summaryYes = document.querySelector(".summary-yes");
 const limitDialog = document.querySelector("#limit-dialog");
 const logoutDialog = document.querySelector("#logout-dialog");
 const infoDialog = document.querySelector("#info-dialog");
+const driveButton = document.querySelector(".header-drive");
 const tutorialVideo = document.querySelector("#tutorial-video");
 const tutorialVideoWrap = document.querySelector(".tutorial-video");
 const albumSelectButton = document.querySelector(".album-select-button");
 const albumOptions = document.querySelector(".album-options");
 const bottomFolderBack = document.querySelector(".bottom-folder-back");
+
+driveButton.addEventListener("click", event => {
+  const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobileDevice) return;
+
+  event.preventDefault();
+  window.open(driveButton.href, "_blank", "noopener,noreferrer");
+});
+
 let currentFilter = "all";
 let nextPageToken = null;
 let loading = false;

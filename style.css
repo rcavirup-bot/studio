@@ -128,9 +128,9 @@ button { font: inherit; }
   transition: background-color .2s ease, transform .2s ease;
 }
 
-.header-info {
+.header-info,
+.header-drive {
   position: absolute;
-  right: 100px;
   top: 50%;
   width: 46px;
   height: 46px;
@@ -152,8 +152,24 @@ button { font: inherit; }
   transition: background-color .2s ease, transform .2s ease;
 }
 
-.header-info:hover { background: rgba(255, 255, 255, .22); }
-.header-info:active { transform: translateY(-50%) scale(.94); }
+.header-info { right: 100px; }
+
+.header-drive {
+  right: 158px;
+  text-decoration: none;
+}
+
+.header-drive svg {
+  width: 23px;
+  height: 21px;
+  display: block;
+  overflow: visible;
+}
+
+.header-info:hover,
+.header-drive:hover { background: rgba(255, 255, 255, .22); }
+.header-info:active,
+.header-drive:active { transform: translateY(-50%) scale(.94); }
 
 .header-logout svg {
   width: 23px;
@@ -1662,8 +1678,17 @@ button { font: inherit; }
 @media (max-width: 899px) {
   .bottom-folder-back,
   .filter-control {
+    background: #dce9f2;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  .filter-control::before {
+    background: linear-gradient(120deg, #224b9a, #112b65);
+  }
+
+  .filter-control.selections-active::before {
+    background: linear-gradient(120deg, #7630a6, #3d196f);
   }
 
   .gallery.short-content {
@@ -1841,11 +1866,13 @@ button { font: inherit; }
   }
   .brand { width: 104px; }
   .header-info,
+  .header-drive,
   .header-logout {
     width: 42px;
     height: 42px;
   }
   .header-info { right: 92px; font-size: 22px; }
+  .header-drive { right: 146px; }
   .header-logout { right: 38px; }
 
   .hero {
@@ -1980,6 +2007,7 @@ button { font: inherit; }
   .header-submit { right: 20px; min-width: 84px; height: 40px; padding: 0 16px; font-size: 14px; }
   .header-logout { right: 20px; width: 40px; height: 40px; }
   .header-info { right: 70px; width: 40px; height: 40px; font-size: 21px; }
+  .header-drive { right: 120px; width: 40px; height: 40px; }
   .album-selector .header-submit { min-width: 102px; height: 40px; margin-left: 14px; padding: 0 13px; }
   .hero { height: 144px; }
   .hero h1 { font-size: clamp(26px, 8.5vw, 38px); margin-bottom: 14px; }
@@ -2013,11 +2041,13 @@ button { font: inherit; }
 
   .brand { width: 80px; }
   .header-info,
+  .header-drive,
   .header-logout {
     width: 36px;
     height: 36px;
   }
   .header-info { right: 58px; font-size: 19px; }
+  .header-drive { right: 102px; }
   .header-logout { right: 14px; }
   .header-logout svg { width: 21px; height: 21px; }
 
